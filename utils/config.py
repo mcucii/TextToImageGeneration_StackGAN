@@ -1,0 +1,6 @@
+DATASET_NAME = "birds"
+EMBEDDING_TYPE = 'cnn-rnn'
+CONFIG_NAME = ''
+GPU_ID = '0'
+CUDA = True
+WORKERS = 6
