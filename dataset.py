@@ -10,15 +10,18 @@ from PIL import Image
 import config as cfg
 
 class TextImageDataset(data.Dataset):
-  def __init__(self, data_dir, split='train', embedding_filename = cfg.EMBEDDING_FILENAME, img_size = 64):
+  def __init__(self, data_dir, split='train', embedding_filename = cfg.EMBEDDING_FILENAME, img_size = 64, input_transform=None,
+                 target_transform=None):
     self.img_size = img_size
     self.data = []
     self.data_dir = data_dir
     self.split = split
     split_dir = os.path.join(data_dir, split)
+    self.input_transform = input_transform
+    self.target_transform = target_transform
 
     self.filenames = self.load_filenames(split_dir)
-    self.embedding = self.load_embedding(split_dir, embedding_filename)
+    self.embeddings = self.load_embeddings(split_dir, embedding_filename)
     self.class_id = self.load_class_id(split_dir, len(self.filenames))
 
   def load_filenames(self, split_dir):
@@ -27,11 +30,11 @@ class TextImageDataset(data.Dataset):
       filenames = pickle.load(f)
     return filenames
   
-  def load_embedding(self, split_dir, embedding_filename):
+  def load_embeddings(self, split_dir, embedding_filename):
     embedding_path = os.path.join(split_dir, embedding_filename)
     with open(embedding_path, "rb") as f:
-      embedding = pickle.load(f)
-    return embedding
+      embeddings = pickle.load(f)
+    return embeddings
 
   def load_class_id(self, split_dir):
     with open(split_dir + '/class_info.pickle', 'rb') as f:
@@ -39,10 +42,11 @@ class TextImageDataset(data.Dataset):
     return class_id
   
 
-
   def get_image(self, path):
     img = Image.open(path)
     img = img.resize((64, 64), PIL.Image.BILINEAR)
+    if self.transform is not None:
+            img = self.transform(img)
     return img
     
 
@@ -53,8 +57,9 @@ class TextImageDataset(data.Dataset):
     img_path = os.path.join(images_path, img_name)
     img = self.get_image(img_path)
 
-    embedding = None
-    #embedding = self.embedding[index]
-    # ??
-    return img, embedding
+    img_embeddings = self.embeddings[index,:, :]
+    rnd_idx = random.randint(0, img_embeddings.shape[0]-1)
+    rnd_img_embedding = img_embeddings[rnd_idx, :]
+
+    return img, rnd_img_embedding
   
