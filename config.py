@@ -1,14 +1,12 @@
 DATASET_NAME = 'birds'
 EMBEDDING_TYPE = 'cnn-rnn'
-CONFIG_NAME = ''
-GPU_ID = '0'
-CUDA = True
 WORKERS = 6
 
 NET_G = ''
 NET_D = ''
 STAGE1_G = ''
-DATA_DIR = '../data/birds'
+DATA_DIR =  '/content/drive/MyDrive/RIProject/data/birds'
+DATA_DIRR = '/content/drive/MyDrive/RIProject/data/birds'
 VAL_DIR = ''
 VIS_COUNT = 64
 
@@ -40,4 +38,4 @@ GAN_R_NUM = 2
 
 TEXT_DIMENSION = 1024
 
-EMBEDDING_FILENAME = "/char-CNN-RNN-embeddings.pickle"
+EMBEDDING_FILENAME = "char-CNN-RNN-embeddings.pickle"
