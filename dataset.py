@@ -26,17 +26,17 @@ class TextImageDataset(data.Dataset):
 
   def load_filenames(self, split_dir):
     filenames_path = os.path.join(split_dir, "filenames.pickle")
-    with open(filenames_path, "rb") as f:
-      filenames = pickle.load(f)
+    with open(filenames_path, 'rb') as f:
+      filenames = pickle.load(f, encoding='latin1')
     return filenames
   
   def load_embeddings(self, split_dir, embedding_filename):
     embedding_path = os.path.join(split_dir, embedding_filename)
-    with open(embedding_path, "rb") as f:
-      embeddings = pickle.load(f)
+    with open(embedding_path, 'rb') as f:
+      embeddings = pickle.load(f, encoding='latin1')
     return embeddings
 
-  def load_class_id(self, split_dir):
+  def load_class_id(self, split_dir, total_num):
     with open(split_dir + '/class_info.pickle', 'rb') as f:
       class_id = pickle.load(f, encoding='latin1')   
     return class_id
@@ -63,3 +63,5 @@ class TextImageDataset(data.Dataset):
 
     return img, rnd_img_embedding
   
+  def __len__(self):
+        return len(self.filenames)
