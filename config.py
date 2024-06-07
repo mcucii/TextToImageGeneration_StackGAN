@@ -6,16 +6,12 @@ NET_G = ''
 NET_D = ''
 STAGE1_G = ''
 DATA_DIR =  '/content/drive/MyDrive/RIProject/data/birds'
-DATA_DIRR = '/content/drive/MyDrive/RIProject/data/birds'
 VAL_DIR = ''
 VIS_COUNT = 64
 
 Z_DIM = 100
 IMG_SIZE = 64
 STAGE = 1
-
-# STAGE1_G = '/content/output/birds__2020_09_05_15_46_24/Model/netG_epoch_600.pth'
-
 
 TRAIN = True
 TRAIN_BATCH_SIZE = 32
@@ -28,6 +24,7 @@ TRAIN_DISCRIMINATOR_LR = 0.0002
 TRAIN_GENERATOR_LR = 0.0002
 
 TRAIN_COEFF_KL = 2.0
+
 
 # Modal options
 
