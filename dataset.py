@@ -41,12 +41,11 @@ class TextImageDataset(data.Dataset):
       class_id = pickle.load(f, encoding='latin1')   
     return class_id
   
-
   def get_image(self, path):
     img = Image.open(path)
     img = img.resize((64, 64), PIL.Image.BILINEAR)
     if self.transform is not None:
-            img = self.transform(img)
+      img = self.transform(img)
     return img
     
 

@@ -1,11 +1,14 @@
 import torch
 import torch.nn as nn
+import torchvision.transforms as transforms
+from PIL import Image
+import numpy as np
 
 import os
 
 import config as cfg
-
 import conditioning_augmentation as ca
+import utils
 
 
 def conv3x3(in_channels, out_channels, stride=1):
@@ -34,7 +37,7 @@ class Stage1_Generator(nn.Module):
         self.fc = nn.Sequential(
             nn.Linear(self.z_dim + self.condition_dim, self.gf_dim * 8 * 4 * 4),
             nn.BatchNorm1d(self.gf_dim * 8 * 4 * 4),
-            nn.ReLU(True)
+            nn.ReLU()
         )
         
         self.upsample1 = upBlock(self.gf_dim * 8, self.gf_dim * 4)
@@ -46,7 +49,7 @@ class Stage1_Generator(nn.Module):
             conv3x3(3, 3),
             nn.Tanh()
         )
-    
+
     def forward(self, text_embedding, noise):
         c, mu, logvar = self.ca_net(text_embedding)
 
@@ -124,3 +127,38 @@ class Stage1_Discriminator(nn.Module):
 
 
 
+class GANTrainer_stage1():
+    def __init__(self, output_dir):
+        self.model_dir = os.path.join(cfg.DATA_DIR, 'Model')
+        self.image_dir = os.path.join(cfg.DATA_DIR, 'Image')
+        if not os.path.exists(self.model_dir):
+            os.makedirs(self.model_dir)
+    
+        if not os.path.exists(self.image_dir):
+            os.makedirs(self.image_dir)
+
+        self.max_epoch = cfg.TRAIN_MAX_EPOCH
+        self.batch_size = cfg.TRAIN_BATCH_SIZE
+    
+    # def get_imgs():
+    #     imgs = []
+    #     for i in range(0, 2911):
+    #         img_path = "../data/birds/models/netG_epoch_360/" + str(i) + ".png"
+    #         img = Image.open(img_path).convert('RGB')
+    #         img = np.array(img)
+    #         imgs.append(img)
+    #     return imgs
+
+    def load_networks(self):
+        netG = Stage1_Generator()  
+        netG.apply(utils.weight_initialization)
+
+        netD = Stage1_Discriminator()
+        netD.apply(utils.weight_initialization)
+
+        return netG, netD
+
+
+    def train(self, dataloader):
+        netG, netD = self.load_networks()
+        # ?????????????????
