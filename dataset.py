@@ -44,20 +44,20 @@ class TextImageDataset(data.Dataset):
   def get_image(self, path):
     img = Image.open(path)
     img = img.resize((64, 64), PIL.Image.BILINEAR)
-    if self.transform is not None:
-      img = self.transform(img)
+    if self.input_transform is not None:
+      img = self.input_transform(img)
     return img
     
 
 # __getitem__ method in Python -> special method that enables instances of a class to use square bracket notation ([]) for accessing element
   def __getitem__(self, index):
-    images_path = os.path.join(self.data_dir, "/CUB_200_2011/images")
-    img_name = self.filenames[index]
+    images_path = os.path.join(self.data_dir, "CUB_200_2011/images")
+    img_name = self.filenames[index] + ".jpg"
     img_path = os.path.join(images_path, img_name)
     img = self.get_image(img_path)
 
-    img_embeddings = self.embeddings[index,:, :]
-    rnd_idx = random.randint(0, img_embeddings.shape[0]-1)
+    img_embeddings = self.embeddings[index][:][:]
+    rnd_idx = random.randint(0, img_embeddings.shape[0] - 1)
     rnd_img_embedding = img_embeddings[rnd_idx, :]
 
     return img, rnd_img_embedding
