@@ -1,6 +1,5 @@
 DATASET_NAME = 'birds'
 EMBEDDING_TYPE = 'cnn-rnn'
-WORKERS = 6
 
 NET_G = ''
 NET_D = ''
