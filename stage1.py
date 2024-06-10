@@ -3,8 +3,9 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 from PIL import Image
 import numpy as np
-
 import os
+
+from torch.optim import Adam
 
 import config as cfg
 import conditioning_augmentation as ca
@@ -161,4 +162,49 @@ class GANTrainer_stage1():
 
     def train(self, dataloader):
         netG, netD = self.load_networks()
-        # ?????????????????
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        netG = netG.to(device)
+        netD = netD.to(device)
+    
+        nz = cfg.Z_DIM
+        batch_size = self.batch_size
+        noise = torch.FloatTensor(batch_size, nz).to(device) 
+        fixed_noise = torch.FloatTensor(batch_size, nz).normal_(0, 1)
+        real_labels = torch.FloatTensor(batch_size).fill_(1)
+        fake_labels = torch.FloatTensor(batch_size).fill_(0)
+
+        generator_lr = cfg.TRAIN_GENERATOR_LR
+        discriminator_lr = cfg.TRAIN_DISCRIMINATOR_LR
+        lr_decay_step = cfg.TRAIN_LR_DECAY_EPOCH
+
+        optimizerG = Adam(netG.parameters(), lr=cfg.TRAIN_GENERATOR_LR)
+        optimizerD = Adam(netD.parameters(), lr=cfg.TRAIN_DISCRIMINATOR_LR)
+        
+        for epoch in range(self.max_epoch):
+            if epoch % lr_decay_step == 0 and epoch > 0:
+                generator_lr *= 0.5
+                for param_group in optimizerG.param_groups:
+                    param_group['lr'] = generator_lr
+
+                discriminator_lr *= 0.5
+                for param_group in optimizerD.param_groups:
+                    param_group['lr'] = discriminator_lr            
+
+            for i, data in enumerate(dataloader, 0):
+                real_img_cpu, txt_embedding = data
+
+                real_imgs = real_img_cpu.to(device)
+                txt_embedding = txt_embedding.to(device)
+  
+                # Generate fake images using the generator network
+                noise.data.normal_(0, 1)
+                inputs = (txt_embedding, noise)
+                fake_imgs, mu, logvar = nn.parallel.data_parallel(netG, inputs, device_ids=[device])
+
+
+                # Update D network
+                # todo
+                
+                # Update G network
+                # todo
