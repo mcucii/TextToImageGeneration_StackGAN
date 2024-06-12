@@ -4,7 +4,7 @@ EMBEDDING_TYPE = 'cnn-rnn'
 NET_G = ''
 NET_D = ''
 STAGE1_G = ''
-DATA_DIR =  '/content/drive/MyDrive/RIProject/data/birds'
+DATA_DIR =  '/content/drive/MyDrive/RIProject/data_reduced/birds'
 VAL_DIR = ''
 VIS_COUNT = 64
 
