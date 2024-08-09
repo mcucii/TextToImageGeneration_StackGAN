@@ -12,11 +12,11 @@ import conditioning_augmentation as ca
 import utils
 
 
-def conv3x3(in_channels, out_channels, stride=1):
-    return nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
+def conv3x3(in_channels, out_channels):
+    return nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
 
 # up sampling
-def upBlock(in_channels, out_channels):
+def upSamplingBlock(in_channels, out_channels):
     block = nn.Sequential(
         nn.Upsample(scale_factor=2, mode='nearest'),
         conv3x3(in_channels, out_channels),
@@ -35,16 +35,19 @@ class Stage1_Generator(nn.Module):
 
         self.ca_net = ca.CANet()
         
+
+        # layers
+
         self.fc = nn.Sequential(
             nn.Linear(self.z_dim + self.condition_dim, self.gf_dim * 8 * 4 * 4),
             nn.BatchNorm1d(self.gf_dim * 8 * 4 * 4),
             nn.ReLU()
         )
         
-        self.upsample1 = upBlock(self.gf_dim * 8, self.gf_dim * 4)
-        self.upsample2 = upBlock(self.gf_dim * 4, self.gf_dim * 2)
-        self.upsample3 = upBlock(self.gf_dim * 2, self.gf_dim)
-        self.upsample4 = upBlock(self.gf_dim, 3)
+        self.upsample1 = upSamplingBlock(self.gf_dim * 8, self.gf_dim * 4)
+        self.upsample2 = upSamplingBlock(self.gf_dim * 4, self.gf_dim * 2)
+        self.upsample3 = upSamplingBlock(self.gf_dim * 2, self.gf_dim)
+        self.upsample4 = upSamplingBlock(self.gf_dim, 3)
         
         self.final = nn.Sequential(
             conv3x3(3, 3),
@@ -80,51 +83,80 @@ class Stage1_Discriminator(nn.Module):
         self.condition_dim = cfg.GAN_CONDITION_DIM
 
         self.conv1 = nn.Sequential(
-            nn.Conv2d(3, self.df_dim, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.LeakyReLU(0.2, inplace=True)
-        )
-        self.conv2 = nn.Sequential(
-            conv3x3(self.df_dim, self.df_dim * 2),
-            nn.BatchNorm2d(self.df_dim * 2),
-            nn.LeakyReLU(0.2, inplace=True)
-        )
-        self.conv3 = nn.Sequential(
-            conv3x3(self.df_dim * 2, self.df_dim * 4),
-            nn.BatchNorm2d(self.df_dim * 4),
-            nn.LeakyReLU(0.2, inplace=True)
-        )
-        self.conv4 = nn.Sequential(
-            conv3x3(self.df_dim * 4, self.df_dim * 8),
-            nn.BatchNorm2d(self.df_dim * 8),
+            nn.Conv2d(3, 96, kernel_size=4, stride=2, padding=1, bias=False),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
-        self.condition_fc = nn.Sequential(
-            nn.Linear(self.condition_dim, self.df_dim * 8 * 4 * 4),
-            nn.ReLU(True)
-        )
+        self.conv2 = self.conv_block(96, 192)
+        self.conv3 = self.conv_block(192, 384)
+        self.conv4 = self.conv_block(384, 768)
 
-        self.final_conv = nn.Sequential(
-            nn.Conv2d(self.df_dim * 16, 1, kernel_size=4, stride=1, padding=0, bias=False),
+        self.fc_output_size = 768 * 4 * 4  # Correct size
+        self.embed_fc = nn.Linear(128, self.fc_output_size)
+        self.embed_bn = nn.BatchNorm1d(self.fc_output_size)
+
+        # Adjust input size to account for concatenation
+        self.fc = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(self.fc_output_size * 2, 1),
             nn.Sigmoid()
         )
 
+    def conv_block(self, in_channels, out_channels):
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+    
     def forward(self, image, condition):
         x = self.conv1(image)
+        #print(f"After conv1: {x.shape}")
+
         x = self.conv2(x)
+        #print(f"After conv2: {x.shape}")
+
         x = self.conv3(x)
+        #print(f"After conv3: {x.shape}")
+
         x = self.conv4(x)
+        #print(f"After conv4: {x.shape}")
 
         # Obrada uslovnog vektora
-        condition = self.condition_fc(condition)
-        condition = condition.view(-1, self.df_dim * 8, 4, 4)
+        condition = self.embed_fc(condition)
+        #print(f"After embed_fc: {condition.shape}")
+        
+        condition = self.embed_bn(condition)
+        #print(f"After embed_bn: {condition.shape}")
+        
+        condition = condition.view(-1, 768, 4, 4)
+        #print(f"After view: {condition.shape}")
 
         # Spajanje osobina slike i uslovnog vektora
         x = torch.cat((x, condition), 1)
+        #print(f"After cat: {x.shape}")
+        
+        x = self.fc(x)
+        #print(f"After fc: {x.shape}")
 
-        x = self.final_conv(x)
-        x = x.view(-1, 1)
         return x
+
+
+    # def forward(self, image, condition):
+    #     x = self.conv1(image)
+    #     x = self.conv2(x)
+    #     x = self.conv3(x)
+    #     x = self.conv4(x)
+
+    #     # Obrada uslovnog vektora
+    #     condition = self.embed_fc(condition)
+    #     condition = self.embed_bn(condition)
+    #     condition = condition.view(-1, 768, 4, 4)
+
+    #     # Spajanje osobina slike i uslovnog vektora
+    #     x = torch.cat((x, condition), 1)
+    #     x = self.fc(x)
+    #     return x
 
 
 
@@ -141,15 +173,6 @@ class GANTrainer_stage1():
         self.max_epoch = cfg.TRAIN_MAX_EPOCH
         self.batch_size = cfg.TRAIN_BATCH_SIZE
     
-    # def get_imgs():
-    #     imgs = []
-    #     for i in range(0, 2911):
-    #         img_path = "../data/birds/models/netG_epoch_360/" + str(i) + ".png"
-    #         img = Image.open(img_path).convert('RGB')
-    #         img = np.array(img)
-    #         imgs.append(img)
-    #     return imgs
-
     def load_networks(self):
         netG = Stage1_Generator()  
         netG.apply(utils.weight_initialization)
@@ -163,23 +186,23 @@ class GANTrainer_stage1():
     def train(self, dataloader):
         netG, netD = self.load_networks()
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         netG = netG.to(device)
         netD = netD.to(device)
     
         nz = cfg.Z_DIM
         batch_size = self.batch_size
-        noise = torch.FloatTensor(batch_size, nz).to(device) 
+        noise = torch.FloatTensor(batch_size, nz).to(device)
         fixed_noise = torch.FloatTensor(batch_size, nz).normal_(0, 1)
-        real_labels = torch.FloatTensor(batch_size).fill_(1)
-        fake_labels = torch.FloatTensor(batch_size).fill_(0)
+        real_labels = torch.FloatTensor(batch_size).fill_(1).to(device)
+        fake_labels = torch.FloatTensor(batch_size).fill_(0).to(device)
 
         generator_lr = cfg.TRAIN_GENERATOR_LR
         discriminator_lr = cfg.TRAIN_DISCRIMINATOR_LR
         lr_decay_step = cfg.TRAIN_LR_DECAY_EPOCH
 
-        optimizerG = Adam(netG.parameters(), lr=cfg.TRAIN_GENERATOR_LR)
-        optimizerD = Adam(netD.parameters(), lr=cfg.TRAIN_DISCRIMINATOR_LR)
+        optimizerG = Adam(netG.parameters(), lr=generator_lr)
+        optimizerD = Adam(netD.parameters(), lr=discriminator_lr)
         
         for epoch in range(self.max_epoch):
             if epoch % lr_decay_step == 0 and epoch > 0:
@@ -193,18 +216,36 @@ class GANTrainer_stage1():
 
             for i, data in enumerate(dataloader, 0):
                 real_img_cpu, txt_embedding = data
-
                 real_imgs = real_img_cpu.to(device)
                 txt_embedding = txt_embedding.to(device)
   
-                # Generate fake images using the generator network
+                # Generisanje laznih slika pomocu generatora G
                 noise.data.normal_(0, 1)
                 inputs = (txt_embedding, noise)
-                fake_imgs, mu, logvar = nn.parallel.data_parallel(netG, inputs, device_ids=[device])
+                fake_imgs, mu, logvar = netG(*inputs)
 
 
-                # Update D network
-                # todo
+                ############################
+                # (1) Azuriraj D mrezu (diskriminator)
+                ###########################
+                netD.zero_grad()
+                errD = utils.discriminator_loss(netD, real_imgs, fake_imgs, real_labels, fake_labels, mu)
+                errD.backward()
+                optimizerD.step()
+
                 
-                # Update G network
+
+                ############################
+                # (2) Azuriraj G mrezu (generator)
+                ###########################
+                netG.zero_grad()
+                errG = utils.generator_loss(netD, fake_imgs, real_labels, mu)
+                kl_loss = utils.KL_loss(mu, logvar)
+                errG_total = errG + kl_loss * cfg.TRAIN_COEFF_KL
+                errG_total.backward()
+                optimizerG.step()
+
+                # na svakih 100 iteracija generisemo slike trenutnim generatorom da pratimo napredak generatora
                 # todo
+
+            utils.save_model(netG, netD, self.max_epoch, self.model_dir)
