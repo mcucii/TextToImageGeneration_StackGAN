@@ -24,6 +24,17 @@ def save_model(netG, netD, epoch, model_dir):
     print('Save G/D models')
 
 
+def save_img_results(data_img, fake_imgs, epoch, img_dir):
+    num = 64 # broj slika koje hocemo da sacuvamo
+    fake_imgs = fake_imgs[0:num]
+    if data_img is not None:
+        data_img = data_img[0:num]
+        # vutils.save_image kombinuje slike iz batch-a u jednu sliku
+        vutils.save_image(data_img, '%s/real_samples.png' % img_dir, normalize=True)
+        vutils.save_image(fake_imgs.data, '%s/fake_samples_epoch_%03d.png' % (img_dir, epoch), normalize=True)
+    else:
+        vutils.save_image(fake_imgs.data, '%s/fake_samples_epoch_%03d.png' % (img_dir, epoch), normalize=True)
+
 
 def discriminator_loss(netD, real_imgs, fake_imgs, real_labels, fake_labels, conditions):
     criterion = nn.BCELoss()

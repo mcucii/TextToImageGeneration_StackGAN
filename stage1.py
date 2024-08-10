@@ -57,6 +57,7 @@ class Stage1_Generator(nn.Module):
     def forward(self, text_embedding, noise):
         c, mu, logvar = self.ca_net(text_embedding)
 
+        c = c.to(noise.device)
         # spajanje suma i uslovnog vektora
         input = torch.cat((noise, c), 1)
 
@@ -193,7 +194,7 @@ class GANTrainer_stage1():
         nz = cfg.Z_DIM
         batch_size = self.batch_size
         noise = torch.FloatTensor(batch_size, nz).to(device)
-        fixed_noise = torch.FloatTensor(batch_size, nz).normal_(0, 1)
+        fixed_noise = torch.FloatTensor(batch_size, nz).normal_(0, 1).to(device) 
         real_labels = torch.FloatTensor(batch_size).fill_(1).to(device)
         fake_labels = torch.FloatTensor(batch_size).fill_(0).to(device)
 
@@ -246,6 +247,9 @@ class GANTrainer_stage1():
                 optimizerG.step()
 
                 # na svakih 100 iteracija generisemo slike trenutnim generatorom da pratimo napredak generatora
-                # todo
-
+                if i % 100 == 0:
+                    inputs = (txt_embedding, fixed_noise)
+                    fake_imgs, _, _ = netG(*inputs)  # Pozivamo generator i dobijamo samo fake slike
+                    utils.save_img_results(real_img_cpu, fake_imgs, epoch, self.image_dir)
+                    
             utils.save_model(netG, netD, self.max_epoch, self.model_dir)
