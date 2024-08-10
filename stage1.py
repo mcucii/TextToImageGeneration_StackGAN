@@ -143,28 +143,10 @@ class Stage1_Discriminator(nn.Module):
         return x
 
 
-    # def forward(self, image, condition):
-    #     x = self.conv1(image)
-    #     x = self.conv2(x)
-    #     x = self.conv3(x)
-    #     x = self.conv4(x)
-
-    #     # Obrada uslovnog vektora
-    #     condition = self.embed_fc(condition)
-    #     condition = self.embed_bn(condition)
-    #     condition = condition.view(-1, 768, 4, 4)
-
-    #     # Spajanje osobina slike i uslovnog vektora
-    #     x = torch.cat((x, condition), 1)
-    #     x = self.fc(x)
-    #     return x
-
-
-
 class GANTrainer_stage1():
     def __init__(self, output_dir):
-        self.model_dir = os.path.join(cfg.DATA_DIR, 'Model')
-        self.image_dir = os.path.join(cfg.DATA_DIR, 'Image')
+        self.model_dir = os.path.join(cfg.DATA_DIR, 'Model_stage1')
+        self.image_dir = os.path.join(cfg.DATA_DIR, 'Images_stage1')
         if not os.path.exists(self.model_dir):
             os.makedirs(self.model_dir)
     
@@ -234,7 +216,6 @@ class GANTrainer_stage1():
                 errD.backward()
                 optimizerD.step()
 
-                
 
                 ############################
                 # (2) Azuriraj G mrezu (generator)
