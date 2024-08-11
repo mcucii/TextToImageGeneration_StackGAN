@@ -92,16 +92,16 @@ class Stage1_Discriminator(nn.Module):
         self.conv3 = self.conv_block(192, 384)
         self.conv4 = self.conv_block(384, 768)
 
-        self.fc_output_size = 768 * 4 * 4  # Correct size
-        self.embed_fc = nn.Linear(128, self.fc_output_size)
+        self.fc_output_size = 768 * 16 * 16
+        self.embed_fc = nn.Linear(self.condition_dim, self.fc_output_size)
         self.embed_bn = nn.BatchNorm1d(self.fc_output_size)
 
-        # Adjust input size to account for concatenation
         self.fc = nn.Sequential(
             nn.Flatten(),
             nn.Linear(self.fc_output_size * 2, 1),
             nn.Sigmoid()
         )
+
 
     def conv_block(self, in_channels, out_channels):
         return nn.Sequential(
@@ -130,10 +130,11 @@ class Stage1_Discriminator(nn.Module):
         condition = self.embed_bn(condition)
         #print(f"After embed_bn: {condition.shape}")
         
-        condition = condition.view(-1, 768, 4, 4)
+        condition = condition.view(-1, 768, 16, 16)
         #print(f"After view: {condition.shape}")
 
         # Spajanje osobina slike i uslovnog vektora
+        #print(f"BEFORE cat X: {x.shape}")
         x = torch.cat((x, condition), 1)
         #print(f"After cat: {x.shape}")
         
