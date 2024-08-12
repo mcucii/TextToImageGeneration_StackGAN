@@ -6,7 +6,9 @@ from torch.optim import Adam
 import config as cfg
 import utils
 import conditioning_augmentation as ca
-from stage1 import Stage1_Generator, Stage1_Discriminator
+from stage1 import Stage1_Generator
+import torch.nn.functional as F
+
 
 
 def conv3x3(in_channels, out_channels):
@@ -21,7 +23,6 @@ def upSamplingBlock(in_channels, out_channels):
         nn.ReLU(True)
     )
     return block
-
 
 
 class ResidualBlock(nn.Module):
@@ -43,7 +44,6 @@ class ResidualBlock(nn.Module):
         out += identity  # dodavanje inputa (residual connection)
         out = self.relu(out)
         return out
-
 
 
 ## proveeeri
@@ -164,19 +164,24 @@ class Stage2_Discriminator(nn.Module):
             nn.Sigmoid()
         )
 
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))  # Dodavanje globalnog average pooling sloja
+
+
     def forward(self, image, condition):
         img_embedding = self.encode_img(image)
-        
-        # Preuređivanje uslovnog vektora da se uklopi sa dimenzijama slike
+        batch_size, _, height, width = img_embedding.size()
+
         cond_embedding = self.encode_condition(condition)
-        cond_embedding = cond_embedding.view(-1, self.df_dim * 8, 4, 4)
-        
-        # Spajanje
+        cond_embedding = cond_embedding.view(batch_size, self.df_dim * 8, 4, 4)
+        cond_embedding = F.interpolate(cond_embedding, size=(height, width), mode='bilinear', align_corners=False)
+
         joint_input = torch.cat((img_embedding, cond_embedding), 1)
         output = self.fc(joint_input)
-        
-        return output.view(-1)
 
+        output = self.pool(output)  # Global average pooling
+        output = output.view(batch_size, -1)  # Flattening da bi dimenzije bile [batch_size, 1]
+
+        return output
 
 
 
@@ -200,10 +205,6 @@ class GANTrainer_stage2():
 
         netD = Stage2_Discriminator()
         netD.apply(utils.weight_initialization)
-
-        netD = Stage1_Discriminator()
-        netD.apply(utils.weight_initialization)
-
         return netG, netD
 
 
@@ -257,6 +258,7 @@ class GANTrainer_stage2():
                 errD.backward()
                 optimizerD.step()
 
+                #print(f"Epoch [{epoch}/{self.max_epoch}], Batch [{i}/{len(dataloader)}], Discriminator Loss: {errD.item()}")
 
                 ############################
                 # (2) Azuriraj G mrezu (generator)
@@ -265,13 +267,16 @@ class GANTrainer_stage2():
                 errG = utils.generator_loss(netD, fake_imgs, real_labels, mu)
                 kl_loss = utils.KL_loss(mu, logvar)
                 errG_total = errG + kl_loss * cfg.TRAIN_COEFF_KL
-                errG_total.backward()
+                errG_total.backward(retain_graph=True)
                 optimizerG.step()
 
-                # na svakih 100 iteracija generisemo slike trenutnim generatorom da pratimo napredak generatora
-                if i % 100 == 0:
+
+                if (epoch * len(dataloader) + i) % 100 == 0:
                     inputs = (txt_embedding, fixed_noise)
                     fake_imgs, _, _ = netG(*inputs)  # Pozivamo generator i dobijamo samo fake slike
                     utils.save_img_results(real_img_cpu, fake_imgs, epoch, self.image_dir)
+
+                torch.cuda.empty_cache()
+
                     
             utils.save_model(netG, netD, self.max_epoch, self.model_dir)
