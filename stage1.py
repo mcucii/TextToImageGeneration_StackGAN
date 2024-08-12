@@ -49,12 +49,13 @@ class Stage1_Generator(nn.Module):
         self.upsample3 = upSamplingBlock(self.gf_dim * 2, self.gf_dim)
         self.upsample4 = upSamplingBlock(self.gf_dim, 3)
         
-        self.final = nn.Sequential(
+        self.img = nn.Sequential(
             conv3x3(3, 3),
             nn.Tanh()
         )
 
     def forward(self, text_embedding, noise):
+       
         c, mu, logvar = self.ca_net(text_embedding)
 
         c = c.to(noise.device)
@@ -70,10 +71,11 @@ class Stage1_Generator(nn.Module):
         x = self.upsample3(x)
         x = self.upsample4(x)
 
-        x = self.final(x)
+        fake_img = self.img(x)
 
         # vracamo generisane slike i statistike za regularizaciju
-        return x, mu, logvar 
+
+        return fake_img, mu, logvar 
     
 
 
@@ -228,10 +230,10 @@ class GANTrainer_stage1():
                 errG_total.backward()
                 optimizerG.step()
 
-                # na svakih 100 iteracija generisemo slike trenutnim generatorom da pratimo napredak generatora
-                if i % 100 == 0:
+                if (epoch * len(dataloader) + i) % 100 == 0:
                     inputs = (txt_embedding, fixed_noise)
                     fake_imgs, _, _ = netG(*inputs)  # Pozivamo generator i dobijamo samo fake slike
                     utils.save_img_results(real_img_cpu, fake_imgs, epoch, self.image_dir)
+        
                     
             utils.save_model(netG, netD, self.max_epoch, self.model_dir)
