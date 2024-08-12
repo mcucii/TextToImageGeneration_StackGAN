@@ -14,6 +14,7 @@ def weight_initialization(m):
         if m.bias is not None:
             nn.init.constant_(m.bias.data, 0.0)
 
+
 def save_model(netG, netD, epoch, model_dir):
     torch.save(
         netG.state_dict(),
@@ -31,22 +32,23 @@ def save_img_results(data_img, fake_imgs, epoch, img_dir):
         data_img = data_img[0:num]
         # vutils.save_image kombinuje slike iz batch-a u jednu sliku
         vutils.save_image(data_img, '%s/real_samples.png' % img_dir, normalize=True)
-        vutils.save_image(fake_imgs.data, '%s/fake_samples_epoch_%03d.png' % (img_dir, epoch), normalize=True)
+        vutils.save_image(fake_imgs, '%s/fake_samples_epoch_%03d.png' % (img_dir, epoch), normalize=True)
     else:
-        vutils.save_image(fake_imgs.data, '%s/fake_samples_epoch_%03d.png' % (img_dir, epoch), normalize=True)
+        vutils.save_image(fake_imgs, '%s/fake_samples_epoch_%03d.png' % (img_dir, epoch), normalize=True)
+
+
 
 
 def discriminator_loss(netD, real_imgs, fake_imgs, real_labels, fake_labels, conditions):
     criterion = nn.BCELoss()
     cond = conditions.detach()
-    fake = fake_imgs.detach()
 
     real_logits = netD(real_imgs, cond)
-    real_labels = real_labels.unsqueeze(1) 
+    real_labels = real_labels.unsqueeze(1).float()
     errD_real = criterion(real_logits, real_labels)
 
-    fake_logits = netD(fake, cond)
-    fake_labels = fake_labels.unsqueeze(1) 
+    fake_logits = netD(fake_imgs, cond)
+    fake_labels = fake_labels.unsqueeze(1).float()
     errD_fake = criterion(fake_logits, fake_labels)
 
     errD = errD_real + errD_fake
