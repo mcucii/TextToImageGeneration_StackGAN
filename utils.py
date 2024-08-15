@@ -2,6 +2,11 @@ import torch
 import torch.nn as nn
 import torchvision.utils as vutils
 
+from PIL import Image, ImageDraw, ImageFont
+import torchvision.transforms as transforms
+import torch.utils.data as data
+
+
 def weight_initialization(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
@@ -25,9 +30,50 @@ def save_model(netG, netD, epoch, model_dir):
     print('Save G/D models')
 
 
+# def save_img_results_with_desc(data_img, fake_imgs, txt_descriptions, epoch, img_dir):
+#     num = 64  # broj slika koje hocemo da sacuvamo
+#     images = images[0:num]
+#     fake_images = fake_images[0:num]
+#     descriptions = txt_descriptions[0:num]
+#     print(descriptions)
+
+#     # Create a font object (you may need to specify the path to a .ttf font file)
+#     font = ImageFont.load_default()
+
+#     def add_text_to_image(image, text):
+#         draw = ImageDraw.Draw(image)
+#         text_size = draw.textsize(text, font=font)
+#         text_x = (image.width - text_size[0]) / 2
+#         text_y = image.height - text_size[1]
+#         draw.text((text_x, text_y), text, font=font, fill=(255, 255, 255))
+#         return image
+    
+#     images_with_text = []
+#     for img, desc in zip(fake_imgs, descriptions):
+#         img_pil = transforms.ToPILImage()(img.cpu())  # Convert tensor to PIL image
+#         img_pil_with_text = add_text_to_image(img_pil, desc)
+#         images_with_text.append(transforms.ToTensor()(img_pil_with_text))  # Convert back to tensor
+
+#     images_with_text = torch.stack(images_with_text)
+
+#     if data_img is not None:
+#         data_img = data_img[0:num]
+#         # Save real images
+#         vutils.save_image(data_img, '%s/real_samples.png' % img_dir, normalize=True)
+
+#     # Save fake images with descriptions
+#     vutils.save_image(images_with_text, '%s/fake_samples_with_text_epoch_%03d.png' % (img_dir, epoch), normalize=True)
+
+#     if fake_imgs is not None:
+#         # Save fake images
+#         vutils.save_image(fake_imgs, '%s/fake_samples_epoch_%03d.png' % (img_dir, epoch), normalize=True)
+
+
 def save_img_results(data_img, fake_imgs, epoch, img_dir):
-    num = 64 # broj slika koje hocemo da sacuvamo
+    num = 64
+    data_img = data_img[0:num]
     fake_imgs = fake_imgs[0:num]
+
     if data_img is not None:
         data_img = data_img[0:num]
         # vutils.save_image kombinuje slike iz batch-a u jednu sliku
@@ -37,18 +83,19 @@ def save_img_results(data_img, fake_imgs, epoch, img_dir):
         vutils.save_image(fake_imgs, '%s/fake_samples_epoch_%03d.png' % (img_dir, epoch), normalize=True)
 
 
-
-
 def discriminator_loss(netD, real_imgs, fake_imgs, real_labels, fake_labels, conditions):
     criterion = nn.BCELoss()
     cond = conditions.detach()
+    fake = fake_imgs.detach()
 
     real_logits = netD(real_imgs, cond)
-    real_labels = real_labels.unsqueeze(1).float()
+    real_labels = real_labels.view(-1)
+    real_logits = real_logits.view(-1)
     errD_real = criterion(real_logits, real_labels)
 
-    fake_logits = netD(fake_imgs, cond)
-    fake_labels = fake_labels.unsqueeze(1).float()
+    fake_logits = netD(fake, cond)
+    fake_labels = fake_labels.view(-1)
+    fake_logits = fake_logits.view(-1)
     errD_fake = criterion(fake_logits, fake_labels)
 
     errD = errD_real + errD_fake
@@ -60,7 +107,8 @@ def generator_loss(netD, fake_imgs, real_labels, conditions):
     cond = conditions.detach()
     
     fake_logits = netD(fake_imgs, cond)
-    real_labels = real_labels.unsqueeze(1)
+    real_labels = real_labels.view(-1)
+    fake_logits = fake_logits.view(-1)
     errD_fake = criterion(fake_logits, real_labels)
     
     return errD_fake
