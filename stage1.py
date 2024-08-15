@@ -187,13 +187,15 @@ class GANTrainer_stage1():
                     param_group['lr'] = discriminator_lr            
 
             for i, data in enumerate(dataloader, 0):
-                real_img_cpu, txt_embedding = data
+                #real_img_cpu, img_embeddings, txt_descriptions = data
+                real_img_cpu, img_embeddings = data
+
                 real_imgs = real_img_cpu.to(device)
-                txt_embedding = txt_embedding.to(device)
+                img_embeddings = img_embeddings.to(device)
   
                 # Generisanje laznih slika pomocu generatora G
                 noise.data.normal_(0, 1)
-                inputs = (txt_embedding, noise)
+                inputs = (img_embeddings, noise)
                 _, fake_imgs, mu, logvar = netG(*inputs)
 
 
@@ -218,9 +220,8 @@ class GANTrainer_stage1():
 
                 if i == 0:
                     with torch.no_grad(): 
-                        inputs = (txt_embedding, fixed_noise)
+                        inputs = (img_embeddings, fixed_noise)
                         fake_source_img, fake_imgs, _, _ = netG(*inputs)
-                        print(f"text embedding: {txt_embedding}")
                         utils.save_img_results(real_img_cpu, fake_imgs.detach(), epoch, self.image_dir)
                         if fake_source_img is not None:
                             utils.save_img_results(None, fake_source_img, epoch, self.image_dir)
