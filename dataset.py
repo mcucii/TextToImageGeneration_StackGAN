@@ -19,9 +19,11 @@ class TextImageDataset(data.Dataset):
     split_dir = os.path.join(data_dir, split)
     self.input_transform = input_transform
     self.target_transform = target_transform
+    self.description_folder = os.path.join(data_dir, 'text_c10')
 
     self.filenames = self.load_filenames(split_dir)
     self.embeddings = self.load_embeddings(split_dir, embedding_filename)
+    self.descriptions = self.load_descriptions()
     self.class_id = self.load_class_id(split_dir, len(self.filenames))
 
   def load_filenames(self, split_dir):
@@ -35,6 +37,21 @@ class TextImageDataset(data.Dataset):
     with open(embedding_path, 'rb') as f:
       embeddings = pickle.load(f, encoding='latin1')
     return embeddings
+  
+  def load_descriptions(self):
+    descriptions = {}
+    for bird_type_folder in os.listdir(self.description_folder):
+      bird_type_path = os.path.join(self.description_folder, bird_type_folder)
+      if os.path.isdir(bird_type_path):
+        for filename in os.listdir(bird_type_path):
+          if filename.endswith('.txt'):
+            file_path = os.path.join(bird_type_path, filename)
+            with open(file_path, 'r') as file:
+              description = file.read().strip()
+              image_name = filename.replace('.txt', '.jpg')  
+              descriptions[image_name] = description
+    return descriptions
+  
 
   def load_class_id(self, split_dir, total_num):
     with open(split_dir + '/class_info.pickle', 'rb') as f:
@@ -57,10 +74,17 @@ class TextImageDataset(data.Dataset):
     img = self.get_image(img_path)
 
     img_embeddings = self.embeddings[index][:][:]
+
+    # if img_name in self.descriptions:
+    #   img_txt_description = self.descriptions[img_name]  
+    # else:
+    #   img_txt_description = "Opis nije pronađen" 
+
     rnd_idx = random.randint(0, img_embeddings.shape[0] - 1)
     rnd_img_embedding = img_embeddings[rnd_idx, :]
-
+    #rnd_txt_description = img_txt_description[rnd_idx, :]
     return img, rnd_img_embedding
+    #return img, rnd_img_embedding, rnd_txt_description
   
   def __len__(self):
         return len(self.filenames)
