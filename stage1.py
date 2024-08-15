@@ -36,21 +36,19 @@ class Stage1_Generator(nn.Module):
         self.ca_net = ca.CANet()
         
 
-        # layers
-
         self.fc = nn.Sequential(
-            nn.Linear(self.z_dim + self.condition_dim, self.gf_dim * 8 * 4 * 4),
-            nn.BatchNorm1d(self.gf_dim * 8 * 4 * 4),
-            nn.ReLU()
+            nn.Linear(self.z_dim + self.condition_dim, self.gf_dim * 4 * 4, bias=False),
+            nn.BatchNorm1d(self.gf_dim * 4 * 4),
+            nn.ReLU(True)
         )
         
-        self.upsample1 = upSamplingBlock(self.gf_dim * 8, self.gf_dim * 4)
-        self.upsample2 = upSamplingBlock(self.gf_dim * 4, self.gf_dim * 2)
-        self.upsample3 = upSamplingBlock(self.gf_dim * 2, self.gf_dim)
-        self.upsample4 = upSamplingBlock(self.gf_dim, 3)
+        self.upsample1 = upSamplingBlock(self.gf_dim, self.gf_dim // 2)
+        self.upsample2 = upSamplingBlock(self.gf_dim // 2, self.gf_dim // 4)
+        self.upsample3 = upSamplingBlock(self.gf_dim // 4, self.gf_dim // 8)
+        self.upsample4 = upSamplingBlock(self.gf_dim // 8, self.gf_dim // 16)
         
         self.img = nn.Sequential(
-            conv3x3(3, 3),
+            conv3x3(self.gf_dim // 16 , 3),
             nn.Tanh()
         )
 
@@ -63,9 +61,8 @@ class Stage1_Generator(nn.Module):
         input = torch.cat((noise, c), 1)
 
         x = self.fc(input)
-        x = x.view(-1, self.gf_dim * 8, 4, 4)
-
-        # upsampling
+        
+        x = x.view(-1, self.gf_dim, 4, 4)
         x = self.upsample1(x)
         x = self.upsample2(x)
         x = self.upsample3(x)
@@ -74,8 +71,8 @@ class Stage1_Generator(nn.Module):
         fake_img = self.img(x)
 
         # vracamo generisane slike i statistike za regularizaciju
-
-        return fake_img, mu, logvar 
+        
+        return None, fake_img, mu, logvar 
     
 
 
@@ -85,65 +82,54 @@ class Stage1_Discriminator(nn.Module):
         self.df_dim = cfg.GAN_DF_DIM
         self.condition_dim = cfg.GAN_CONDITION_DIM
 
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(3, 96, kernel_size=4, stride=2, padding=1, bias=False),
+        # Konvolucioni slojevi za obrada slika
+        self.encode_img = nn.Sequential(
+            nn.Conv2d(3, self.df_dim, 4, 2, 1, bias=False),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Conv2d(self.df_dim, self.df_dim * 2, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(self.df_dim * 2),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Conv2d(self.df_dim * 2, self.df_dim * 4, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(self.df_dim * 4),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Conv2d(self.df_dim * 4, self.df_dim * 8, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(self.df_dim * 8),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
-        self.conv2 = self.conv_block(96, 192)
-        self.conv3 = self.conv_block(192, 384)
-        self.conv4 = self.conv_block(384, 768)
+        # Sloj za obradu uslovnog vektora
+        self.embed_fc = nn.Linear(self.condition_dim, self.df_dim * 8 * 4 * 4)
+        self.embed_bn = nn.BatchNorm1d(self.df_dim * 8 * 4 * 4)
 
-        self.fc_output_size = 768 * 16 * 16
-        self.embed_fc = nn.Linear(self.condition_dim, self.fc_output_size)
-        self.embed_bn = nn.BatchNorm1d(self.fc_output_size)
+        # Sloj za finalnu procenu
+        self.outlogits = nn.Sequential(
+            nn.Conv2d(self.df_dim * 8 + self.df_dim * 8, self.df_dim * 8, kernel_size=1, padding=1),
+            nn.BatchNorm2d(self.df_dim * 8),
+            nn.LeakyReLU(0.2, inplace=True),
 
-        self.fc = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(self.fc_output_size * 2, 1),
+            nn.Conv2d(self.df_dim * 8, 1, kernel_size=4, stride=4),
             nn.Sigmoid()
         )
 
 
-    def conv_block(self, in_channels, out_channels):
-        return nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.LeakyReLU(0.2, inplace=True)
-        )
-    
     def forward(self, image, condition):
-        x = self.conv1(image)
-        #print(f"After conv1: {x.shape}")
-
-        x = self.conv2(x)
-        #print(f"After conv2: {x.shape}")
-
-        x = self.conv3(x)
-        #print(f"After conv3: {x.shape}")
-
-        x = self.conv4(x)
-        #print(f"After conv4: {x.shape}")
+        # Obrada slike
+        h_code = self.encode_img(image)
 
         # Obrada uslovnog vektora
         condition = self.embed_fc(condition)
-        #print(f"After embed_fc: {condition.shape}")
-        
         condition = self.embed_bn(condition)
-        #print(f"After embed_bn: {condition.shape}")
-        
-        condition = condition.view(-1, 768, 16, 16)
-        #print(f"After view: {condition.shape}")
+        condition = condition.view(-1, self.df_dim * 8, 4, 4)
 
-        # Spajanje osobina slike i uslovnog vektora
-        #print(f"BEFORE cat X: {x.shape}")
-        x = torch.cat((x, condition), 1)
-        #print(f"After cat: {x.shape}")
-        
-        x = self.fc(x)
-        #print(f"After fc: {x.shape}")
+        # Spajanje slike i uslovnog vektora
+        h_c_code = torch.cat((h_code, condition), 1)
 
-        return x
+        # Finalna procena
+        output = self.outlogits(h_c_code)
+        return output.view(-1)
 
 
 class GANTrainer_stage1():
@@ -208,7 +194,7 @@ class GANTrainer_stage1():
                 # Generisanje laznih slika pomocu generatora G
                 noise.data.normal_(0, 1)
                 inputs = (txt_embedding, noise)
-                fake_imgs, mu, logvar = netG(*inputs)
+                _, fake_imgs, mu, logvar = netG(*inputs)
 
 
                 ############################
@@ -230,10 +216,14 @@ class GANTrainer_stage1():
                 errG_total.backward()
                 optimizerG.step()
 
-                if (epoch * len(dataloader) + i) % 100 == 0:
-                    inputs = (txt_embedding, fixed_noise)
-                    fake_imgs, _, _ = netG(*inputs)  # Pozivamo generator i dobijamo samo fake slike
-                    utils.save_img_results(real_img_cpu, fake_imgs, epoch, self.image_dir)
-        
+                if i == 0:
+                    with torch.no_grad(): 
+                        inputs = (txt_embedding, fixed_noise)
+                        fake_source_img, fake_imgs, _, _ = netG(*inputs)
+                        print(f"text embedding: {txt_embedding}")
+                        utils.save_img_results(real_img_cpu, fake_imgs.detach(), epoch, self.image_dir)
+                        if fake_source_img is not None:
+                            utils.save_img_results(None, fake_source_img, epoch, self.image_dir)
+
                     
             utils.save_model(netG, netD, self.max_epoch, self.model_dir)

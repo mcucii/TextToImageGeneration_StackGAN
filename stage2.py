@@ -102,7 +102,7 @@ class Stage2_Generator(nn.Module):
             nn.Tanh())
         
     def forward(self, text_embedding, noise):
-        stage1_img, _, _ = self.Stage1_G(text_embedding, noise)
+        _,stage1_img, _, _ = self.Stage1_G(text_embedding, noise)
         stage1_img = stage1_img.detach()
 
         # encode stage1 image 
@@ -121,7 +121,8 @@ class Stage2_Generator(nn.Module):
         h_code = self.upsample4(h_code)
 
         fake_img = self.img(h_code)
-        return fake_img, mu, logvar
+        #print(f"fake image stage 2 shape{fake_img.shape}")
+        return stage1_img, fake_img, mu, logvar
 
 
 class Stage2_Discriminator(nn.Module):
@@ -247,7 +248,7 @@ class GANTrainer_stage2():
                 # Generisanje laznih slika pomocu generatora G
                 noise.data.normal_(0, 1)
                 inputs = (txt_embedding, noise)
-                fake_imgs, mu, logvar = netG(*inputs)
+                _, fake_imgs, mu, logvar = netG(*inputs)
 
 
                 ############################
@@ -258,7 +259,6 @@ class GANTrainer_stage2():
                 errD.backward()
                 optimizerD.step()
 
-                #print(f"Epoch [{epoch}/{self.max_epoch}], Batch [{i}/{len(dataloader)}], Discriminator Loss: {errD.item()}")
 
                 ############################
                 # (2) Azuriraj G mrezu (generator)
@@ -267,16 +267,19 @@ class GANTrainer_stage2():
                 errG = utils.generator_loss(netD, fake_imgs, real_labels, mu)
                 kl_loss = utils.KL_loss(mu, logvar)
                 errG_total = errG + kl_loss * cfg.TRAIN_COEFF_KL
-                errG_total.backward(retain_graph=True)
+                errG_total.backward()
                 optimizerG.step()
 
+                # za svaku epohu, prolazimo kroz dataloader i cuvamo samo prvu instancu podataka za i=0, tj mi tehnicki pratimo (cuvamo) prvi batch i kako tece njegovo treniranje
+                if i == 0:
+                    with torch.no_grad(): 
+                        inputs = (txt_embedding, fixed_noise)
+                        fake_source_img, fake_imgs, _, _ = netG(*inputs)
+                        utils.save_img_results(real_img_cpu, fake_imgs.detach(), epoch, self.image_dir)
+                        if fake_source_img is not None:
+                            utils.save_img_results(None, fake_source_img, epoch, self.image_dir)
 
-                if (epoch * len(dataloader) + i) % 100 == 0:
-                    inputs = (txt_embedding, fixed_noise)
-                    fake_imgs, _, _ = netG(*inputs)  # Pozivamo generator i dobijamo samo fake slike
-                    utils.save_img_results(real_img_cpu, fake_imgs, epoch, self.image_dir)
-
-                torch.cuda.empty_cache()
+                #torch.cuda.empty_cache()
 
                     
             utils.save_model(netG, netD, self.max_epoch, self.model_dir)
