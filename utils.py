@@ -70,12 +70,7 @@ def save_model(netG, netD, epoch, model_dir):
 
 
 def save_img_results(data_img, fake_imgs, epoch, img_dir):
-    num = 64
-    data_img = data_img[0:num]
-    fake_imgs = fake_imgs[0:num]
-
     if data_img is not None:
-        data_img = data_img[0:num]
         # vutils.save_image kombinuje slike iz batch-a u jednu sliku
         vutils.save_image(data_img, '%s/real_samples.png' % img_dir, normalize=True)
         vutils.save_image(fake_imgs, '%s/fake_samples_epoch_%03d.png' % (img_dir, epoch), normalize=True)
@@ -85,20 +80,27 @@ def save_img_results(data_img, fake_imgs, epoch, img_dir):
 
 def discriminator_loss(netD, real_imgs, fake_imgs, real_labels, fake_labels, conditions):
     criterion = nn.BCELoss()
+    batch_size = real_imgs.size(0)
+
     cond = conditions.detach()
     fake = fake_imgs.detach()
 
-    real_logits = netD(real_imgs, cond)
-    real_labels = real_labels.view(-1)
-    real_logits = real_logits.view(-1)
-    errD_real = criterion(real_logits, real_labels)
+    # Real parovi
+    real_features = netD(real_imgs, cond)
+    errD_real = criterion(real_features.view(-1), real_labels.view(-1))
 
-    fake_logits = netD(fake, cond)
-    fake_labels = fake_labels.view(-1)
-    fake_logits = fake_logits.view(-1)
-    errD_fake = criterion(fake_logits, fake_labels)
+    # Pogrešni parovi (realne slike uparene sa pogrešnim uslovima)
+    wrong_cond = cond[1:]  # Pomeri uslove za jedan uzorak
+    wrong_features = netD(real_imgs[:batch_size-1], wrong_cond)
+    errD_wrong = criterion(wrong_features.view(-1), fake_labels[1:].view(-1))
+   
+    # Lažni parovi
+    fake_features = netD(fake, cond)
+    errD_fake = criterion(fake_features.view(-1), fake_labels.view(-1))
 
-    errD = errD_real + errD_fake
+    
+    errD = errD_real + (errD_fake + errD_wrong) * 0.5
+
     return errD
 
 
@@ -107,9 +109,7 @@ def generator_loss(netD, fake_imgs, real_labels, conditions):
     cond = conditions.detach()
     
     fake_logits = netD(fake_imgs, cond)
-    real_labels = real_labels.view(-1)
-    fake_logits = fake_logits.view(-1)
-    errD_fake = criterion(fake_logits, real_labels)
+    errD_fake = criterion(fake_logits.view(-1), real_labels.view(-1))
     
     return errD_fake
 
