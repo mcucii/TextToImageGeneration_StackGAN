@@ -24,24 +24,22 @@ def upSamplingBlock(in_channels, out_channels):
     )
     return block
 
-
+    
 class ResidualBlock(nn.Module):
     def __init__(self, in_channels):
         super(ResidualBlock, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(in_channels)
+        self.block = nn.Sequential(
+            conv3x3(in_channels, in_channels),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True),
+            conv3x3(in_channels, in_channels),
+            nn.BatchNorm2d(in_channels))
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(in_channels)
-        
+
     def forward(self, x):
-        identity = x
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-        out = self.conv2(out)
-        out = self.bn2(out)
-        out += identity  # dodavanje inputa (residual connection)
+        residual = x
+        out = self.block(x)
+        out += residual # dodavanje inputa (residual connection)
         out = self.relu(out)
         return out
 
@@ -102,7 +100,7 @@ class Stage2_Generator(nn.Module):
             nn.Tanh())
         
     def forward(self, text_embedding, noise):
-        _,stage1_img, _, _ = self.Stage1_G(text_embedding, noise)
+        _, stage1_img, _, _ = self.Stage1_G(text_embedding, noise)
         stage1_img = stage1_img.detach()
 
         # encode stage1 image 
@@ -147,14 +145,27 @@ class Stage2_Discriminator(nn.Module):
             nn.Conv2d(self.df_dim * 4, self.df_dim * 8, 4, 2, 1, bias=False),
             nn.BatchNorm2d(self.df_dim * 8),
             nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Conv2d(self.df_dim * 8, self.df_dim * 16, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(self.df_dim * 16),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Conv2d(self.df_dim * 16, self.df_dim * 32, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(self.df_dim * 32),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            conv3x3(self.df_dim * 32, self.df_dim * 16),
+            nn.BatchNorm2d(self.df_dim * 16),
+            nn.LeakyReLU(0.2, inplace=True), 
+
+            conv3x3(self.df_dim * 16, self.df_dim * 8),
+            nn.BatchNorm2d(self.df_dim * 8),
+            nn.LeakyReLU(0.2, inplace=True) 
         )
         
-        # Konvolucioni slojevi za obradu uslovnog vektora
-        self.encode_condition = nn.Sequential(
-            nn.Linear(self.condition_dim, self.df_dim * 8 * 4 * 4, bias=False),
-            nn.BatchNorm1d(self.df_dim * 8 * 4 * 4),
-            nn.LeakyReLU(0.2, inplace=True)
-        )
+        # slojevi za obradu uslovnog vektora
+        self.embed_fc = nn.Linear(self.condition_dim, self.df_dim * 8 * 4 * 4)
+        self.embed_bn = nn.BatchNorm1d(self.df_dim * 8 * 4 * 4)
         
         # Završni sloj za kombinovanje uslovnog vektora i slike
         self.fc = nn.Sequential(
@@ -165,24 +176,22 @@ class Stage2_Discriminator(nn.Module):
             nn.Sigmoid()
         )
 
-        self.pool = nn.AdaptiveAvgPool2d((1, 1))  # Dodavanje globalnog average pooling sloja
-
 
     def forward(self, image, condition):
+        # Obrada slike
         img_embedding = self.encode_img(image)
-        batch_size, _, height, width = img_embedding.size()
 
-        cond_embedding = self.encode_condition(condition)
-        cond_embedding = cond_embedding.view(batch_size, self.df_dim * 8, 4, 4)
-        cond_embedding = F.interpolate(cond_embedding, size=(height, width), mode='bilinear', align_corners=False)
+        # Obrada uslovnog vektora
+        condition = self.embed_fc(condition)
+        condition = self.embed_bn(condition)
+        condition = condition.view(-1, self.df_dim * 8, 4, 4)
 
-        joint_input = torch.cat((img_embedding, cond_embedding), 1)
-        output = self.fc(joint_input)
+        # Spajanje slike i uslovnog vektora
+        h_c_code = torch.cat((img_embedding, condition), 1)
 
-        output = self.pool(output)  # Global average pooling
-        output = output.view(batch_size, -1)  # Flattening da bi dimenzije bile [batch_size, 1]
-
-        return output
+        # Finalna procena
+        output = self.fc(h_c_code)
+        return output.view(-1)
 
 
 
@@ -204,8 +213,27 @@ class GANTrainer_stage2():
         netG = Stage2_Generator(Stage1_G)  
         netG.apply(utils.weight_initialization)
 
+        if cfg.NET_G != '':
+            state_dict = torch.load(cfg.NET_G, map_location=lambda storage, loc: storage)
+            netG.load_state_dict(state_dict)
+            print('Load from: ', cfg.NET_G)
+        elif cfg.STAGE1_G != '':
+            state_dict = torch.load(cfg.STAGE1_G)
+            netG.Stage1_G.load_state_dict(state_dict)
+            print('Load from: ', cfg.STAGE1_G)
+        else:
+            print("Please give the Stage1_G path")
+            return
+
+
         netD = Stage2_Discriminator()
         netD.apply(utils.weight_initialization)
+        if cfg.NET_D != '':
+            state_dict = torch.load(cfg.NET_D, map_location=lambda storage, loc: storage)
+            netD.load_state_dict(state_dict)
+            print('Load from: ', cfg.NET_D)
+
+
         return netG, netD
 
 
@@ -220,15 +248,16 @@ class GANTrainer_stage2():
         batch_size = self.batch_size
         noise = torch.FloatTensor(batch_size, nz).to(device)
         fixed_noise = torch.FloatTensor(batch_size, nz).normal_(0, 1).to(device) 
+                     
         real_labels = torch.FloatTensor(batch_size).fill_(1).to(device)
         fake_labels = torch.FloatTensor(batch_size).fill_(0).to(device)
 
+        lr_decay_step = 30 # posle koliko epoha se koeficijent ucenja smanjuje
         generator_lr = cfg.TRAIN_GENERATOR_LR
         discriminator_lr = cfg.TRAIN_DISCRIMINATOR_LR
-        lr_decay_step = cfg.TRAIN_LR_DECAY_EPOCH
 
-        optimizerG = Adam(netG.parameters(), lr=generator_lr)
-        optimizerD = Adam(netD.parameters(), lr=discriminator_lr)
+        optimizerG = Adam(netG.parameters(), lr=cfg.TRAIN_GENERATOR_LR, betas=(0.5, 0.999))
+        optimizerD = Adam(netD.parameters(), lr=cfg.TRAIN_DISCRIMINATOR_LR, betas=(0.5, 0.999) )
         
         for epoch in range(self.max_epoch):
             if epoch % lr_decay_step == 0 and epoch > 0:
@@ -279,7 +308,6 @@ class GANTrainer_stage2():
                         if fake_source_img is not None:
                             utils.save_img_results(None, fake_source_img, epoch, self.image_dir)
 
-                #torch.cuda.empty_cache()
 
-                    
             utils.save_model(netG, netD, self.max_epoch, self.model_dir)
+

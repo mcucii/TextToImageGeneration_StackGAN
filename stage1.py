@@ -53,13 +53,10 @@ class Stage1_Generator(nn.Module):
         )
 
     def forward(self, text_embedding, noise):
-       
         c, mu, logvar = self.ca_net(text_embedding)
 
-        c = c.to(noise.device)
         # spajanje suma i uslovnog vektora
         input = torch.cat((noise, c), 1)
-
         x = self.fc(input)
         
         x = x.view(-1, self.gf_dim, 4, 4)
@@ -71,7 +68,6 @@ class Stage1_Generator(nn.Module):
         fake_img = self.img(x)
 
         # vracamo generisane slike i statistike za regularizaciju
-        
         return None, fake_img, mu, logvar 
     
 
@@ -82,7 +78,6 @@ class Stage1_Discriminator(nn.Module):
         self.df_dim = cfg.GAN_DF_DIM
         self.condition_dim = cfg.GAN_CONDITION_DIM
 
-        # Konvolucioni slojevi za obrada slika
         self.encode_img = nn.Sequential(
             nn.Conv2d(3, self.df_dim, 4, 2, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
@@ -113,7 +108,6 @@ class Stage1_Discriminator(nn.Module):
             nn.Conv2d(self.df_dim * 8, 1, kernel_size=4, stride=4),
             nn.Sigmoid()
         )
-
 
     def forward(self, image, condition):
         # Obrada slike
