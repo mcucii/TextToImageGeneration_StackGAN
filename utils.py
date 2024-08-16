@@ -26,7 +26,7 @@ def save_model(netG, netD, epoch, model_dir):
         '%s/netG_epoch_%d.pth' % (model_dir, epoch))
     torch.save(
         netD.state_dict(),
-        '%s/netD_epoch_last.pth' % (model_dir))
+        '%s/netD_epoch_%d.pth' % (model_dir, epoch))
     print('Save G/D models')
 
 
@@ -75,7 +75,7 @@ def save_img_results(data_img, fake_imgs, epoch, img_dir):
         vutils.save_image(data_img, '%s/real_samples.png' % img_dir, normalize=True)
         vutils.save_image(fake_imgs, '%s/fake_samples_epoch_%03d.png' % (img_dir, epoch), normalize=True)
     else:
-        vutils.save_image(fake_imgs, '%s/fake_samples_epoch_%03d.png' % (img_dir, epoch), normalize=True)
+        vutils.save_image(fake_imgs, '%s/fake_samples_epoch_%03d_stage1.png' % (img_dir, epoch), normalize=True)
 
 
 def discriminator_loss(netD, real_imgs, fake_imgs, real_labels, fake_labels, conditions):
