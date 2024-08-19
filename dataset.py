@@ -4,6 +4,8 @@ import PIL
 import pickle
 import numpy as np
 import random
+import torchvision.transforms as transforms
+
 
 from PIL import Image
 
@@ -25,6 +27,9 @@ class TextImageDataset(data.Dataset):
     self.embeddings = self.load_embeddings(split_dir, embedding_filename)
     self.descriptions = self.load_descriptions()
     self.class_id = self.load_class_id(split_dir, len(self.filenames))
+
+    if self.input_transform is None:
+            self.input_transform = transforms.ToTensor()
 
   def load_filenames(self, split_dir):
     filenames_path = os.path.join(split_dir, "filenames.pickle")
@@ -60,7 +65,7 @@ class TextImageDataset(data.Dataset):
   
   def get_image(self, path):
     img = Image.open(path)
-    img = img.resize((64, 64), PIL.Image.BILINEAR)
+    img = img.resize((cfg.IMG_SIZE, cfg.IMG_SIZE), PIL.Image.BILINEAR)
     if self.input_transform is not None:
       img = self.input_transform(img)
     return img
