@@ -11,7 +11,7 @@ class CANet(nn.Module):
     super(CANet, self).__init__()
     self.text_dim = cfg.TEXT_DIMENSION
     self.c_dim = cfg.GAN_CONDITION_DIM
-    self.fc = nn.Linear(self.text_dim, self.c_dim*2)
+    self.fc = nn.Linear(self.text_dim, self.c_dim*2, bias=True)
     self.relu = nn.ReLU()
 
   # encoding - transforms text embedding into a form that can be used to condition the GAN's generator and discriminator
