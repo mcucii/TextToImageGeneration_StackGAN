@@ -10,7 +10,6 @@ from stage1 import Stage1_Generator
 import torch.nn.functional as F
 
 
-
 def conv3x3(in_channels, out_channels):
     return nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
 
@@ -44,7 +43,6 @@ class ResidualBlock(nn.Module):
         return out
 
 
-## proveeeri
 def concat_along_dims(c, x):
     """Joins the conditioned text with the encoded image along the dimensions."""
     c = c.unsqueeze(2).unsqueeze(3)  # Adding two dimensions
@@ -165,8 +163,8 @@ class Stage2_Discriminator(nn.Module):
         
         # slojevi za obradu uslovnog vektora
         self.embed_fc = nn.Linear(self.condition_dim, self.df_dim * 8 * 4 * 4)
-        self.embed_bn = nn.BatchNorm1d(self.df_dim * 8 * 4 * 4)
-        
+        self.embed_bn = nn.BatchNorm2d(self.df_dim * 8)
+      
         # Završni sloj za kombinovanje uslovnog vektora i slike
         self.fc = nn.Sequential(
             nn.Conv2d(self.df_dim * 8 + self.df_dim * 8, self.df_dim * 8, 3, 1, 1, bias=False),
@@ -176,6 +174,8 @@ class Stage2_Discriminator(nn.Module):
             nn.Sigmoid()
         )
 
+        self.upsample = nn.Upsample(scale_factor=4, mode='bilinear', align_corners=False)
+
 
     def forward(self, image, condition):
         # Obrada slike
@@ -183,8 +183,8 @@ class Stage2_Discriminator(nn.Module):
 
         # Obrada uslovnog vektora
         condition = self.embed_fc(condition)
-        condition = self.embed_bn(condition)
         condition = condition.view(-1, self.df_dim * 8, 4, 4)
+        condition = self.embed_bn(condition)
 
         # Spajanje slike i uslovnog vektora
         h_c_code = torch.cat((img_embedding, condition), 1)
@@ -208,23 +208,23 @@ class GANTrainer_stage2():
         self.max_epoch = cfg.TRAIN_MAX_EPOCH
         self.batch_size = cfg.TRAIN_BATCH_SIZE
     
+
     def load_networks(self):
         Stage1_G = Stage1_Generator()
         netG = Stage2_Generator(Stage1_G)  
         netG.apply(utils.weight_initialization)
 
         if cfg.NET_G != '':
-            state_dict = torch.load(cfg.NET_G, map_location=lambda storage, loc: storage)
+            state_dict = torch.load(cfg.NET_G, map_location=torch.device('cpu'))
             netG.load_state_dict(state_dict)
             print('Load from: ', cfg.NET_G)
         elif cfg.STAGE1_G != '':
-            state_dict = torch.load(cfg.STAGE1_G)
+            state_dict = torch.load(cfg.STAGE1_G, map_location=torch.device('cpu'))
             netG.Stage1_G.load_state_dict(state_dict)
             print('Load from: ', cfg.STAGE1_G)
         else:
             print("Please give the Stage1_G path")
             return
-
 
         netD = Stage2_Discriminator()
         netD.apply(utils.weight_initialization)
@@ -232,7 +232,6 @@ class GANTrainer_stage2():
             state_dict = torch.load(cfg.NET_D, map_location=lambda storage, loc: storage)
             netD.load_state_dict(state_dict)
             print('Load from: ', cfg.NET_D)
-
 
         return netG, netD
 
