@@ -60,8 +60,8 @@ class Stage2_Generator(nn.Module):
         self.Stage1_G = Stage1_Generator
 
         # Stage 1 model parameters are frozen
-        for param in self.Stage1_G.parameters():
-            param.requires_grad = False
+        # for param in self.Stage1_G.parameters():
+        #     param.requires_grad = False
 
         self.ca_net = ca.CANet()
 
@@ -233,13 +233,16 @@ class GANTrainer_stage2():
             netD.load_state_dict(state_dict)
             print('Load from: ', cfg.NET_D)
 
+        netG.to(cfg.DEVICE)
+        netD.to(cfg.DEVICE)
+
         return netG, netD
 
 
     def train(self, dataloader):
         netG, netD = self.load_networks()
 
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = cfg.DEVICE
         netG = netG.to(device)
         netD = netD.to(device)
     
@@ -247,7 +250,6 @@ class GANTrainer_stage2():
         batch_size = self.batch_size
         noise = torch.FloatTensor(batch_size, nz).to(device)
         fixed_noise = torch.FloatTensor(batch_size, nz).normal_(0, 1).to(device) 
-                     
         real_labels = torch.FloatTensor(batch_size).fill_(1).to(device)
         fake_labels = torch.FloatTensor(batch_size).fill_(0).to(device)
 
@@ -260,11 +262,11 @@ class GANTrainer_stage2():
         
         for epoch in range(self.max_epoch):
             if epoch % lr_decay_step == 0 and epoch > 0:
-                generator_lr *= 0.5
+                generator_lr *= 0.3
                 for param_group in optimizerG.param_groups:
                     param_group['lr'] = generator_lr
 
-                discriminator_lr *= 0.5
+                discriminator_lr *= 0.3
                 for param_group in optimizerD.param_groups:
                     param_group['lr'] = discriminator_lr            
 
@@ -294,9 +296,12 @@ class GANTrainer_stage2():
                 netG.zero_grad()
                 errG = utils.generator_loss(netD, fake_imgs, real_labels, mu)
                 kl_loss = utils.KL_loss(mu, logvar)
-                errG_total = errG + kl_loss * cfg.TRAIN_COEFF_KL
+                errG_total = errG + kl_loss * 2
                 errG_total.backward()
                 optimizerG.step()
+
+                print(f'Epoch [{epoch}/{self.max_epoch}], Step [{i}/{len(dataloader)}], '
+                       f'Generator Loss: {errG_total.item()}, Discriminator Loss: {errD.item()}')
 
                 # za svaku epohu, prolazimo kroz dataloader i cuvamo samo prvu instancu podataka za i=0, tj mi tehnicki pratimo (cuvamo) prvi batch i kako tece njegovo treniranje
                 if i == 0:

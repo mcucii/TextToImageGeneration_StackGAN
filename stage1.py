@@ -55,7 +55,10 @@ class Stage1_Generator(nn.Module):
     def forward(self, text_embedding, noise):
         c, mu, logvar = self.ca_net(text_embedding)
 
+        c.to(cfg.DEVICE)
+
         # spajanje suma i uslovnog vektora
+
         input = torch.cat((noise, c), 1)
         x = self.fc(input)
         
@@ -146,20 +149,21 @@ class GANTrainer_stage1():
         netD = Stage1_Discriminator()
         netD.apply(utils.weight_initialization)
 
+        netG.to(cfg.DEVICE)
+        netD.to(cfg.DEVICE)
+        
         return netG, netD
 
 
     def train(self, dataloader):
         netG, netD = self.load_networks()
-
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        netG = netG.to(device)
-        netD = netD.to(device)
     
         nz = cfg.Z_DIM
         batch_size = self.batch_size
+        
+        device = cfg.DEVICE
         noise = torch.FloatTensor(batch_size, nz).to(device)
-        fixed_noise = torch.FloatTensor(batch_size, nz).normal_(0, 1).to(device) 
+        fixed_noise = torch.FloatTensor(batch_size, nz).normal_(0, 1).to(device)
         real_labels = torch.FloatTensor(batch_size).fill_(1).to(device)
         fake_labels = torch.FloatTensor(batch_size).fill_(0).to(device)
 
@@ -167,16 +171,17 @@ class GANTrainer_stage1():
         discriminator_lr = cfg.TRAIN_DISCRIMINATOR_LR
         lr_decay_step = cfg.TRAIN_LR_DECAY_EPOCH
 
-        optimizerG = Adam(netG.parameters(), lr=generator_lr)
-        optimizerD = Adam(netD.parameters(), lr=discriminator_lr)
+        optimizerG = torch.optim.Adam(netG.parameters(), lr=generator_lr, betas=(0.5, 0.999))
+        optimizerD = torch.optim.Adam(netD.parameters(), lr=discriminator_lr, betas=(0.5, 0.999))
+
         
         for epoch in range(self.max_epoch):
             if epoch % lr_decay_step == 0 and epoch > 0:
-                generator_lr *= 0.5
+                generator_lr *= 0.3
                 for param_group in optimizerG.param_groups:
                     param_group['lr'] = generator_lr
 
-                discriminator_lr *= 0.5
+                discriminator_lr *= 0.3
                 for param_group in optimizerD.param_groups:
                     param_group['lr'] = discriminator_lr            
 
@@ -208,9 +213,13 @@ class GANTrainer_stage1():
                 netG.zero_grad()
                 errG = utils.generator_loss(netD, fake_imgs, real_labels, mu)
                 kl_loss = utils.KL_loss(mu, logvar)
-                errG_total = errG + kl_loss * cfg.TRAIN_COEFF_KL
+                errG_total = errG + kl_loss * 2
                 errG_total.backward()
                 optimizerG.step()
+
+                print(f'Epoch [{epoch}/{self.max_epoch}], Step [{i}/{len(dataloader)}], '
+                       f'Generator Loss: {errG_total.item()}, Discriminator Loss: {errD.item()}')
+
 
                 if i == 0:
                     with torch.no_grad(): 

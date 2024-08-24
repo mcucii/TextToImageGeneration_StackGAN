@@ -1,6 +1,8 @@
 DATASET_NAME = 'birds'
 EMBEDDING_TYPE = 'cnn-rnn'
 
+DEVICE = 'cpu'
+
 NET_G = ''  # putanja do fajla sa težinama modela
 NET_D = ''
 STAGE1_G = ''
@@ -21,8 +23,6 @@ TRAIN_PRETRAINED_EPOCH = 600
 TRAIN_LR_DECAY_EPOCH = 30    # posle koliko epoha se koeficijent ucenja smanjuje
 TRAIN_DISCRIMINATOR_LR = 0.0002
 TRAIN_GENERATOR_LR = 0.0002
-
-TRAIN_COEFF_KL = 2.0
 
 
 # Modal options

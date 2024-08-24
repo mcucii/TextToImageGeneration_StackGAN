@@ -89,16 +89,15 @@ def discriminator_loss(netD, real_imgs, fake_imgs, real_labels, fake_labels, con
     real_features = netD(real_imgs, cond)
     errD_real = criterion(real_features.view(-1), real_labels.view(-1))
 
-    # Pogrešni parovi (realne slike uparene sa pogrešnim uslovima)
-    wrong_cond = cond[1:]  # Pomeri uslove za jedan uzorak
-    wrong_features = netD(real_imgs[:batch_size-1], wrong_cond)
-    errD_wrong = criterion(wrong_features.view(-1), fake_labels[1:].view(-1))
+    # Pogrešni parovi (realne slike uparene sa pogrešnim random uslovima)
+    wrong_cond = cond[torch.randperm(batch_size)]  # Slučajna permutacija
+    wrong_features = netD(real_imgs, wrong_cond)
+    errD_wrong = criterion(wrong_features.view(-1), fake_labels.view(-1))
    
     # Lažni parovi
     fake_features = netD(fake, cond)
     errD_fake = criterion(fake_features.view(-1), fake_labels.view(-1))
 
-    
     errD = errD_real + (errD_fake + errD_wrong) * 0.5
 
     return errD
@@ -106,9 +105,11 @@ def discriminator_loss(netD, real_imgs, fake_imgs, real_labels, fake_labels, con
 
 def generator_loss(netD, fake_imgs, real_labels, conditions):
     criterion = nn.BCELoss()
+    # detach() se ne koristi jer gradijenti trebaju biti uključeni kako bi se pravilno obučio generator
     cond = conditions.detach()
+    fake = fake_imgs
     
-    fake_logits = netD(fake_imgs, cond)
+    fake_logits = netD(fake, cond)
     errD_fake = criterion(fake_logits.view(-1), real_labels.view(-1))
     
     return errD_fake
