@@ -8,7 +8,7 @@
 
 
 Reduced CUB_200_2011 dataset (20 species): 
-[https://drive.google.com/drive/folders/1uPboyta4anht5dgA7FbFFq31GVvvduPM?usp=sharing ](https://drive.google.com/drive/folders/1A0CgePNm66i7hfmxeDswO6fFKZyyWNzA) (slike su u birds/CUB_200_2011/images)
+https://drive.google.com/drive/folders/1l8sFO4cgtxAsK9L57Ilh-8p8qe23ZYRt (slike su u birds/CUB_200_2011/images)
 
 1. faza - generisane slike: https://drive.google.com/drive/folders/1oQ8ofZBVk5mB-XhaK9QJwz9g-OmWWZX1
 2. faza - generisane slike: 
