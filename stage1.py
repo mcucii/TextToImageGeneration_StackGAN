@@ -15,7 +15,6 @@ import utils
 def conv3x3(in_channels, out_channels):
     return nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
 
-# up sampling
 def upSamplingBlock(in_channels, out_channels):
     block = nn.Sequential(
         nn.Upsample(scale_factor=2, mode='nearest'),
@@ -35,7 +34,6 @@ class Stage1_Generator(nn.Module):
 
         self.ca_net = ca.CANet()
         
-
         self.fc = nn.Sequential(
             nn.Linear(self.z_dim + self.condition_dim, self.gf_dim * 4 * 4, bias=False),
             nn.BatchNorm1d(self.gf_dim * 4 * 4),
@@ -46,7 +44,7 @@ class Stage1_Generator(nn.Module):
         self.upsample2 = upSamplingBlock(self.gf_dim // 2, self.gf_dim // 4)
         self.upsample3 = upSamplingBlock(self.gf_dim // 4, self.gf_dim // 8)
         self.upsample4 = upSamplingBlock(self.gf_dim // 8, self.gf_dim // 16)
-        
+
         self.img = nn.Sequential(
             conv3x3(self.gf_dim // 16 , 3),
             nn.Tanh()
@@ -58,7 +56,6 @@ class Stage1_Generator(nn.Module):
         c.to(cfg.DEVICE)
 
         # spajanje suma i uslovnog vektora
-
         input = torch.cat((noise, c), 1)
         x = self.fc(input)
         
@@ -210,10 +207,15 @@ class GANTrainer_stage1():
                 ############################
                 # (2) Azuriraj G mrezu (generator)
                 ###########################
+                # netG.zero_grad()
+                # errG = utils.generator_loss(netD, fake_imgs, real_labels, mu, logvar)
+                # kl_loss = utils.KL_loss(mu, logvar)
+                # errG_total = errG + kl_loss * 2
+                # errG_total.backward()
+                # optimizerG.step()
+
                 netG.zero_grad()
-                errG = utils.generator_loss(netD, fake_imgs, real_labels, mu)
-                kl_loss = utils.KL_loss(mu, logvar)
-                errG_total = errG + kl_loss * 2
+                errG_total = utils.generator_loss(netD, fake_imgs, real_labels, mu, logvar)
                 errG_total.backward()
                 optimizerG.step()
 
