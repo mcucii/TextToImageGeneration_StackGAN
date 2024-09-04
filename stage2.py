@@ -50,7 +50,6 @@ def concat_along_dims(c, x):
     return torch.cat([c, x], dim=1)  # Concatenate along the channel dimension
 
 
-
 class Stage2_Generator(nn.Module):
     def __init__(self, Stage1_Generator):
         super(Stage2_Generator, self).__init__()
@@ -59,11 +58,18 @@ class Stage2_Generator(nn.Module):
         self.z_dim = cfg.Z_DIM
         self.Stage1_G = Stage1_Generator
 
-        # Stage 1 model parameters are frozen
-        # for param in self.Stage1_G.parameters():
-        #     param.requires_grad = False
+        for param in self.Stage1_G.parameters():
+            param.requires_grad = False
 
         self.ca_net = ca.CANet()
+
+
+        
+        self.residual = self._make_layer(ResBlock, ngf * 4)
+
+        self.img = nn.Sequential(
+            conv3x3(ngf // 4, 3),
+            nn.Tanh())
 
         # Encoding image from Stage1
         self.encoder = nn.Sequential(
@@ -108,6 +114,7 @@ class Stage2_Generator(nn.Module):
         c_code = c_code.view(-1, self.condition_dim, 1, 1)
         c_code = c_code.repeat(1, 1, 16, 16)
         i_c_code = torch.cat([encoded_img, c_code], 1)
+
         h_code = self.hr_joint(i_c_code)
         h_code = self.residual(h_code)
 
@@ -262,11 +269,11 @@ class GANTrainer_stage2():
         
         for epoch in range(self.max_epoch):
             if epoch % lr_decay_step == 0 and epoch > 0:
-                generator_lr *= 0.3
+                generator_lr *= 0.5
                 for param_group in optimizerG.param_groups:
                     param_group['lr'] = generator_lr
 
-                discriminator_lr *= 0.3
+                discriminator_lr *= 0.5
                 for param_group in optimizerD.param_groups:
                     param_group['lr'] = discriminator_lr            
 
@@ -293,10 +300,9 @@ class GANTrainer_stage2():
                 ############################
                 # (2) Azuriraj G mrezu (generator)
                 ###########################
+
                 netG.zero_grad()
-                errG = utils.generator_loss(netD, fake_imgs, real_labels, mu)
-                kl_loss = utils.KL_loss(mu, logvar)
-                errG_total = errG + kl_loss * 2
+                errG_total = utils.generator_loss(netD, fake_imgs, real_labels, mu, logvar)
                 errG_total.backward()
                 optimizerG.step()
 

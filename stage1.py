@@ -174,11 +174,11 @@ class GANTrainer_stage1():
         
         for epoch in range(self.max_epoch):
             if epoch % lr_decay_step == 0 and epoch > 0:
-                generator_lr *= 0.3
+                generator_lr *= 0.5
                 for param_group in optimizerG.param_groups:
                     param_group['lr'] = generator_lr
 
-                discriminator_lr *= 0.3
+                discriminator_lr *= 0.5
                 for param_group in optimizerD.param_groups:
                     param_group['lr'] = discriminator_lr            
 

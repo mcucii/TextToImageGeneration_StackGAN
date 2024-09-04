@@ -103,7 +103,7 @@ def discriminator_loss(netD, real_imgs, fake_imgs, real_labels, fake_labels, con
     return errD
 
 
-def generator_loss(netD, fake_imgs, real_labels, conditions):
+def generator_loss(netD, fake_imgs, real_labels, conditions, logvar):
     criterion = nn.BCELoss()
     # detach() se ne koristi jer gradijenti trebaju biti uključeni kako bi se pravilno obučio generator
     cond = conditions.detach()
@@ -112,7 +112,11 @@ def generator_loss(netD, fake_imgs, real_labels, conditions):
     fake_logits = netD(fake, cond)
     errD_fake = criterion(fake_logits.view(-1), real_labels.view(-1))
     
-    return errD_fake
+    kl_loss = KL_loss(conditions, logvar)
+    errG_total = errD_fake + kl_loss * 2
+
+    #return errD_fake
+    return errG_total
 
 
 def KL_loss(mu, logvar):
