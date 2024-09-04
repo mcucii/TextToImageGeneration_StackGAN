@@ -64,7 +64,7 @@ class TextImageDataset(data.Dataset):
     return class_id
   
   def get_image(self, path):
-    img = Image.open(path)
+    img = Image.open(path).convert("RGB");
     img = img.resize((cfg.IMG_SIZE, cfg.IMG_SIZE), PIL.Image.BILINEAR)
     if self.input_transform is not None:
       img = self.input_transform(img)
@@ -80,14 +80,17 @@ class TextImageDataset(data.Dataset):
 
     img_embeddings = self.embeddings[index][:][:]
 
-    # if img_name in self.descriptions:
-    #   img_txt_description = self.descriptions[img_name]  
-    # else:
-    #   img_txt_description = "Opis nije pronađen" 
+    if img_name in self.descriptions:
+      img_txt_description = self.descriptions[img_name]  
+    else:
+      img_txt_description = "Opis nije pronađen" 
+
+    #print(f'img_embeddings_shape : {img_embeddings.shape[0]}')
 
     rnd_idx = random.randint(0, img_embeddings.shape[0] - 1)
     rnd_img_embedding = img_embeddings[rnd_idx, :]
     #rnd_txt_description = img_txt_description[rnd_idx, :]
+
     return img, rnd_img_embedding
     #return img, rnd_img_embedding, rnd_txt_description
   
