@@ -5,11 +5,16 @@ import pickle
 import numpy as np
 import random
 import torchvision.transforms as transforms
+import random
 
 
 from PIL import Image
 
 import config as cfg
+
+def get_random_line(text):
+    lines = text.splitlines()  # Podeli tekst na linije
+    return random.choice(lines).strip() 
 
 class TextImageDataset(data.Dataset):
   def __init__(self, data_dir, split='train', embedding_filename = cfg.EMBEDDING_FILENAME, img_size = 64, input_transform=None,
@@ -79,20 +84,40 @@ class TextImageDataset(data.Dataset):
     img = self.get_image(img_path)
 
     img_embeddings = self.embeddings[index][:][:]
-
-    if img_name in self.descriptions:
-      img_txt_description = self.descriptions[img_name]  
+    
+    img_base_name = os.path.basename(img_name)
+    if img_base_name in self.descriptions:
+      img_txt_description = self.descriptions[img_base_name]  
     else:
       img_txt_description = "Opis nije pronađen" 
 
-    #print(f'img_embeddings_shape : {img_embeddings.shape[0]}')
-
     rnd_idx = random.randint(0, img_embeddings.shape[0] - 1)
     rnd_img_embedding = img_embeddings[rnd_idx, :]
-    #rnd_txt_description = img_txt_description[rnd_idx, :]
+    rnd_txt_description = get_random_line(img_txt_description)
 
-    return img, rnd_img_embedding
-    #return img, rnd_img_embedding, rnd_txt_description
+    #return img, rnd_img_embedding
+    return img, rnd_img_embedding, rnd_txt_description
+
+    # ## eksperiment sa samo jednom slikom
+    # img_name_fake = self.filenames[0] + ".jpg"
+    # img_path_fake = os.path.join(images_path, img_name_fake)
+    # img_fake = self.get_image(img_path_fake)
+
+    # img_embeddings = self.embeddings[0][:][:]
+    
+    # img_base_name = os.path.basename(img_name_fake)
+    # if img_base_name in self.descriptions:
+    #   img_txt_description = self.descriptions[img_base_name]  
+    # else:
+    #   img_txt_description = "Opis nije pronađen" 
+
+    # rnd_idx = 0
+    # rnd_img_embedding = img_embeddings[0, :]
+    # rnd_txt_description = get_random_line(img_txt_description)
+
+    # #return img, rnd_img_embedding
+    # return img_fake, rnd_img_embedding, rnd_txt_description
+    
   
   def __len__(self):
         return len(self.filenames)
