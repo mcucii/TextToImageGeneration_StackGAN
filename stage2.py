@@ -9,6 +9,8 @@ import conditioning_augmentation as ca
 from stage1 import Stage1_Generator
 import torch.nn.functional as F
 
+generator_losses = []
+discriminator_losses = []
 
 def conv3x3(in_channels, out_channels):
     return nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
@@ -62,15 +64,7 @@ class Stage2_Generator(nn.Module):
             param.requires_grad = False
 
         self.ca_net = ca.CANet()
-
-
         
-        self.residual = self._make_layer(ResBlock, ngf * 4)
-
-        self.img = nn.Sequential(
-            conv3x3(ngf // 4, 3),
-            nn.Tanh())
-
         # Encoding image from Stage1
         self.encoder = nn.Sequential(
             conv3x3(3, self.gf_dim),
@@ -252,21 +246,24 @@ class GANTrainer_stage2():
         device = cfg.DEVICE
         netG = netG.to(device)
         netD = netD.to(device)
-    
+
         nz = cfg.Z_DIM
         batch_size = self.batch_size
+    
         noise = torch.FloatTensor(batch_size, nz).to(device)
         fixed_noise = torch.FloatTensor(batch_size, nz).normal_(0, 1).to(device) 
         real_labels = torch.FloatTensor(batch_size).fill_(1).to(device)
         fake_labels = torch.FloatTensor(batch_size).fill_(0).to(device)
 
-        lr_decay_step = 30 # posle koliko epoha se koeficijent ucenja smanjuje
+        lr_decay_step = cfg.TRAIN_LR_DECAY_EPOCH # posle koliko epoha se koeficijent ucenja smanjuje
         generator_lr = cfg.TRAIN_GENERATOR_LR
         discriminator_lr = cfg.TRAIN_DISCRIMINATOR_LR
 
         optimizerG = Adam(netG.parameters(), lr=cfg.TRAIN_GENERATOR_LR, betas=(0.5, 0.999))
         optimizerD = Adam(netD.parameters(), lr=cfg.TRAIN_DISCRIMINATOR_LR, betas=(0.5, 0.999) )
         
+        lambda_gp = 10
+
         for epoch in range(self.max_epoch):
             if epoch % lr_decay_step == 0 and epoch > 0:
                 generator_lr *= 0.5
@@ -275,14 +272,23 @@ class GANTrainer_stage2():
 
                 discriminator_lr *= 0.5
                 for param_group in optimizerD.param_groups:
-                    param_group['lr'] = discriminator_lr            
+                    param_group['lr'] = discriminator_lr     
+
+            descriptions = []       
+
+            total_G_loss = 0.0
+            total_D_loss = 0.0
+            batch_count = 0       
 
             for i, data in enumerate(dataloader, 0):
-                real_img_cpu, txt_embedding = data
+                real_img_cpu, txt_embedding, txt_descriptions = data
+                
                 real_imgs = real_img_cpu.to(device)
                 txt_embedding = txt_embedding.to(device)
   
                 # Generisanje laznih slika pomocu generatora G
+                #noise = torch.randn(batch_size, nz, device=device)
+
                 noise.data.normal_(0, 1)
                 inputs = (txt_embedding, noise)
                 _, fake_imgs, mu, logvar = netG(*inputs)
@@ -306,6 +312,12 @@ class GANTrainer_stage2():
                 errG_total.backward()
                 optimizerG.step()
 
+                total_G_loss += errG_total.item()
+                total_D_loss += errD.item()
+
+                batch_count += 1
+                descriptions = txt_descriptions
+
                 print(f'Epoch [{epoch}/{self.max_epoch}], Step [{i}/{len(dataloader)}], '
                        f'Generator Loss: {errG_total.item()}, Discriminator Loss: {errD.item()}')
 
@@ -317,7 +329,55 @@ class GANTrainer_stage2():
                         utils.save_img_results(real_img_cpu, fake_imgs.detach(), epoch, self.image_dir)
                         if fake_source_img is not None:
                             utils.save_img_results(None, fake_source_img, epoch, self.image_dir)
+            
+            avg_G_loss = total_G_loss / batch_count
+            avg_D_loss = total_D_loss / batch_count
+            
+            generator_losses.append(errG_total.item())
+            discriminator_losses.append(errD.item())
 
+            if epoch == cfg.TRAIN_MAX_EPOCH - 1:
+                print(f"Descriptions for epoch {epoch+1}:")
+                print(descriptions)
+                print("\n")
 
             utils.save_model(netG, netD, self.max_epoch, self.model_dir)
 
+        utils.plot_losses(generator_losses, discriminator_losses)
+
+    def test(self, dataloader, stage=1):
+        netG, _ = self.load_networks()
+
+        # path to save generated samples
+        save_dir = cfg.NET_G[:cfg.NET_G.find('.pth')]
+        if not os.path.isdir(save_dir):
+            mkdir_p(save_dir)
+
+        nz = cfg.Z_DIM
+        batch_size = self.batch_size
+        noise = Variable(torch.FloatTensor(batch_size, nz))
+
+        count = 0
+        for i, data in enumerate(data_loader, 0):
+            _, txt_embedding = data
+            txt_embedding = Variable(txt_embedding)
+
+            if cfg.CUDA:
+                txt_embedding = txt_embedding.cuda()
+
+            noise.data.normal_(0, 1)
+            inputs = (txt_embedding, noise)
+
+            _, fake_imgs, mu, logvar = netG(*inputs)
+
+            utils.save_test_results(fake_imgs, count, save_dir)
+
+            # for i in range(batch_size):
+            #     save_name = '%s/%d.png' % (save_dir, count + i)
+            #     im = fake_imgs[i].data.cpu().numpy()
+            #     im = (im + 1.0) * 127.5
+            #     im = im.astype(np.uint8)
+            #     im = np.transpose(im, (1, 2, 0))
+            #     im = Image.fromarray(im)
+            #     im.save(save_name)
+            count += batch_size
