@@ -11,6 +11,12 @@ import config as cfg
 import conditioning_augmentation as ca
 import utils
 
+import matplotlib.pyplot as plt
+
+
+generator_losses = []
+discriminator_losses = []
+
 
 def conv3x3(in_channels, out_channels):
     return nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
@@ -20,10 +26,9 @@ def upSamplingBlock(in_channels, out_channels):
         nn.Upsample(scale_factor=2, mode='nearest'),
         conv3x3(in_channels, out_channels),
         nn.BatchNorm2d(out_channels),
-        nn.ReLU(True)
+        nn.LeakyReLU(0.2, inplace=True)
     )
     return block
-
 
 class Stage1_Generator(nn.Module):
     def __init__(self):
@@ -70,7 +75,6 @@ class Stage1_Generator(nn.Module):
         # vracamo generisane slike i statistike za regularizaciju
         return None, fake_img, mu, logvar 
     
-
 
 class Stage1_Discriminator(nn.Module):
     def __init__(self):
@@ -154,11 +158,14 @@ class GANTrainer_stage1():
 
     def train(self, dataloader):
         netG, netD = self.load_networks()
+
+        device = cfg.DEVICE
+        netG = netG.to(device)
+        netD = netD.to(device)
     
         nz = cfg.Z_DIM
         batch_size = self.batch_size
         
-        device = cfg.DEVICE
         noise = torch.FloatTensor(batch_size, nz).to(device)
         fixed_noise = torch.FloatTensor(batch_size, nz).normal_(0, 1).to(device)
         real_labels = torch.FloatTensor(batch_size).fill_(1).to(device)
@@ -170,7 +177,10 @@ class GANTrainer_stage1():
 
         optimizerG = torch.optim.Adam(netG.parameters(), lr=generator_lr, betas=(0.5, 0.999))
         optimizerD = torch.optim.Adam(netD.parameters(), lr=discriminator_lr, betas=(0.5, 0.999))
+        # optimizerG = torch.optim.Adam(netG.parameters(), lr=generator_lr, betas=(0.5, 0.999))
+        # optimizerD = torch.optim.SGD(netD.parameters(), lr=discriminator_lr, momentum=0.9)
 
+        lambda_gp = 10
         
         for epoch in range(self.max_epoch):
             if epoch % lr_decay_step == 0 and epoch > 0:
@@ -180,11 +190,17 @@ class GANTrainer_stage1():
 
                 discriminator_lr *= 0.5
                 for param_group in optimizerD.param_groups:
-                    param_group['lr'] = discriminator_lr            
+                    param_group['lr'] = discriminator_lr     
+
+            descriptions = []       
+
+            total_G_loss = 0.0
+            total_D_loss = 0.0
+            batch_count = 0
 
             for i, data in enumerate(dataloader, 0):
-                #real_img_cpu, img_embeddings, txt_descriptions = data
-                real_img_cpu, img_embeddings = data
+                real_img_cpu, img_embeddings, txt_descriptions = data
+                #real_img_cpu, img_embeddings = data
 
                 real_imgs = real_img_cpu.to(device)
                 img_embeddings = img_embeddings.to(device)
@@ -207,29 +223,82 @@ class GANTrainer_stage1():
                 ############################
                 # (2) Azuriraj G mrezu (generator)
                 ###########################
-                # netG.zero_grad()
-                # errG = utils.generator_loss(netD, fake_imgs, real_labels, mu, logvar)
-                # kl_loss = utils.KL_loss(mu, logvar)
-                # errG_total = errG + kl_loss * 2
-                # errG_total.backward()
-                # optimizerG.step()
 
                 netG.zero_grad()
                 errG_total = utils.generator_loss(netD, fake_imgs, real_labels, mu, logvar)
                 errG_total.backward()
                 optimizerG.step()
 
+                total_G_loss += errG_total.item()
+                total_D_loss += errD.item()
+
+                batch_count += 1
+                descriptions = txt_descriptions
+
                 print(f'Epoch [{epoch}/{self.max_epoch}], Step [{i}/{len(dataloader)}], '
                        f'Generator Loss: {errG_total.item()}, Discriminator Loss: {errD.item()}')
-
 
                 if i == 0:
                     with torch.no_grad(): 
                         inputs = (img_embeddings, fixed_noise)
-                        fake_source_img, fake_imgs, _, _ = netG(*inputs)
+                        _, fake_imgs, _, _ = netG(*inputs)
                         utils.save_img_results(real_img_cpu, fake_imgs.detach(), epoch, self.image_dir)
-                        if fake_source_img is not None:
-                            utils.save_img_results(None, fake_source_img, epoch, self.image_dir)
+                        #utils.save_img_results_with_desc(real_img_cpu, fake_imgs.detach(), txt_descriptions, epoch, self.image_dir)
+                        # if fake_source_img is not None:
+                        #     utils.save_img_results(None, fake_source_img, epoch, self.image_dir)
+                        
+            avg_G_loss = total_G_loss / batch_count
+            avg_D_loss = total_D_loss / batch_count
+            
+            generator_losses.append(errG_total.item())
+            discriminator_losses.append(errD.item())
 
+            if epoch == cfg.TRAIN_MAX_EPOCH - 1:
+                print(f"Descriptions for epoch {epoch+1}:")
+                print(descriptions)
+                print("\n")
                     
             utils.save_model(netG, netD, self.max_epoch, self.model_dir)
+
+        utils.plot_losses(generator_losses, discriminator_losses)
+
+    def test(self, dataloader, stage=1):
+        netG, _ = self.load_networks()
+
+        # path to save generated samples
+        save_dir = cfg.NET_G[:cfg.NET_G.find('.pth')]
+        if not os.path.isdir(save_dir):
+            mkdir_p(save_dir)
+
+        nz = cfg.Z_DIM
+        batch_size = self.batch_size
+        noise = Variable(torch.FloatTensor(batch_size, nz))
+
+        count = 0
+        for i, data in enumerate(data_loader, 0):
+            _, txt_embedding = data
+            txt_embedding = Variable(txt_embedding)
+
+            if cfg.CUDA:
+                txt_embedding = txt_embedding.cuda()
+
+            noise.data.normal_(0, 1)
+            inputs = (txt_embedding, noise)
+
+            _, fake_imgs, mu, logvar = netG(*inputs)
+
+            utils.save_test_results(fake_imgs, count, save_dir)
+
+            # for i in range(batch_size):
+            #     save_name = '%s/%d.png' % (save_dir, count + i)
+            #     im = fake_imgs[i].data.cpu().numpy()
+            #     im = (im + 1.0) * 127.5
+            #     im = im.astype(np.uint8)
+            #     im = np.transpose(im, (1, 2, 0))
+            #     im = Image.fromarray(im)
+            #     im.save(save_name)
+            count += batch_size
+
+
+
+
