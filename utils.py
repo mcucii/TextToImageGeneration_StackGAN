@@ -10,23 +10,18 @@ import torch.autograd as autograd
 
 import matplotlib.pyplot as plt
 
-
-
-
-
 def weight_initialization(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
-        nn.init.normal_(m.weight.data, 0.0, 0.02)
+        m.weight.data.normal_(0.0, 0.02)
     elif classname.find('BatchNorm') != -1:
-        nn.init.normal_(m.weight.data, 1.0, 0.02)
-        nn.init.constant_(m.bias.data, 0.0)
+        m.weight.data.normal_(1.0, 0.02)
+        m.bias.data.fill_(0)
     elif classname.find('Linear') != -1:
-        nn.init.normal_(m.weight.data, 0.0, 0.02)
+        m.weight.data.normal_(0.0, 0.02)
         if m.bias is not None:
-            nn.init.constant_(m.bias.data, 0.0)
-
-
+            m.bias.data.fill_(0.0)
+            
 
 def save_model(netG, netD, epoch, model_dir):
     torch.save(
@@ -38,58 +33,10 @@ def save_model(netG, netD, epoch, model_dir):
     print('Save G/D models')
 
 
-def save_img_results_with_desc(data_img, fake_images, txt_descriptions, epoch, img_dir):
-    num = 64  # broj slika koje hocemo da sacuvamo
-    data_img = data_img[0:num]
-    fake_images = fake_images[0:num]
-    descriptions = txt_descriptions[0:num]
-
-    font_size = 20  # Povećaj veličinu fonta za bolju vidljivost
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"  # Koristi jasan font
-    
-    try:
-        font = ImageFont.truetype(font_path, font_size)
-    except IOError:
-        font = ImageFont.load_default()  # Ako ne uspe, koristi podrazumevani font
-
-    def add_text_to_image(image, text):
-        image = image.convert("RGB")  # Pretvori u RGB format da izbegneš neprirodne boje
-        draw = ImageDraw.Draw(image)
-
-        # Dobij veličinu teksta za centriranje
-        text_size = draw.textsize(text, font=font)
-
-        # Kreiraj novu sliku sa dodatnim prostorom za tekst
-        new_image = Image.new("RGB", (image.width, image.height + text_size[1] + 10), (0, 0, 0))
-        new_image.paste(image, (0, 0))
-
-        # Pozicioniraj tekst na dnu slike
-        text_x = (new_image.width - text_size[0]) / 2
-        text_y = image.height
-        draw.text((text_x, text_y), text, font=font, fill=(255, 255, 255))  # Bela boja teksta za vidljivost
-        return new_image
-
-    images_with_text = []
-    for img, desc in zip(fake_images, descriptions):
-        img_pil = transforms.ToPILImage()(img.cpu())  # Konvertuj tenzor u PIL sliku
-        img_pil_with_text = add_text_to_image(img_pil, desc)
-        images_with_text.append(transforms.ToTensor()(img_pil_with_text))  # Konvertuj nazad u tenzor
-
-    images_with_text = torch.stack(images_with_text)
-
-    # Sačuvaj slike bez normalizacije
-    vutils.save_image(images_with_text, '%s/fake_samples_with_text_epoch_%03d.png' % (img_dir, epoch))
-
-
 def save_test_results(fake_imgs, count, img_dir):
-    # Kreiraj direktorijum ako ne postoji
     if not os.path.isdir(img_dir):
         os.makedirs(img_dir)
-
-    # Sačuvaj generisane slike
     vutils.save_image(fake_imgs, '%s/fake_samples_test_%03d.png' % (img_dir, count), normalize=True)
-
-
 
 
 def save_img_results(data_img, fake_imgs, epoch, img_dir):
@@ -126,7 +73,6 @@ def discriminator_loss(netD, real_imgs, fake_imgs, real_labels, fake_labels, con
     #print(f'FAKE FEATURES BY DISC - fake_imgs real_cond: {fake_features}\n')
 
     errD = errD_real + (errD_fake + errD_wrong)*0.5
-    #errD = errD_real
 
     return errD
 
@@ -139,12 +85,11 @@ def generator_loss(netD, fake_imgs, real_labels, conditions, logvar):
     
     fake_features = netD(fake, cond)
     errD_fake = criterion(fake_features.view(-1), real_labels.view(-1))
-    #print(f'FAKE DISC OUTPUT IN GEN - fake imgs, real cond: {fake_features}\n\n')
-    
-    kl_loss = KL_loss2(conditions, logvar)
-    errG_total = errD_fake + kl_loss*2
+    #errD_fake = -torch.mean(torch.log(fake_features + 1e-8))  # Izbegavanje log(0) dodavanjem malog epsilon-a
 
-    #return errD_fake
+    kl_loss = KL_loss(conditions, logvar)
+    errG_total = errD_fake + kl_loss*0.5
+
     return errG_total
 
 
@@ -152,18 +97,6 @@ def KL_loss(mu, logvar):
     # -0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
     KLD_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar)
     KLD = torch.mean(KLD_element).mul_(-0.5)
-    return KLD
-
-def KL_loss2(mu, logvar):
-    # Pretvaranje logvar u varijansu (sigma^2)
-    sigma_sq = torch.exp(logvar)
-    
-    # Izračunavanje KL divergence
-    KLD_element = -0.5 * (1 + logvar - mu.pow(2) - sigma_sq)
-    
-    # Uzmi srednju vrednost preko svih dimenzija
-    KLD = torch.mean(KLD_element)
-    
     return KLD
 
 

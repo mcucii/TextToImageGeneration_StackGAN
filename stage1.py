@@ -178,9 +178,11 @@ class GANTrainer_stage1():
         optimizerG = torch.optim.Adam(netG.parameters(), lr=generator_lr, betas=(0.5, 0.999))
         optimizerD = torch.optim.Adam(netD.parameters(), lr=discriminator_lr, betas=(0.5, 0.999))
         # optimizerG = torch.optim.Adam(netG.parameters(), lr=generator_lr, betas=(0.5, 0.999))
-        # optimizerD = torch.optim.SGD(netD.parameters(), lr=discriminator_lr, momentum=0.9)
+        #optimizerD = torch.optim.SGD(netD.parameters(), lr=discriminator_lr, momentum=0.9)
 
         lambda_gp = 10
+
+        print(f"broj epoha {self.max_epoch}")
         
         for epoch in range(self.max_epoch):
             if epoch % lr_decay_step == 0 and epoch > 0:
@@ -206,10 +208,9 @@ class GANTrainer_stage1():
                 img_embeddings = img_embeddings.to(device)
   
                 # Generisanje laznih slika pomocu generatora G
-                noise.data.normal_(0, 1)
+                noise.normal_(0, 1)
                 inputs = (img_embeddings, noise)
                 _, fake_imgs, mu, logvar = netG(*inputs)
-
 
                 ############################
                 # (1) Azuriraj D mrezu (diskriminator)
@@ -218,7 +219,6 @@ class GANTrainer_stage1():
                 errD = utils.discriminator_loss(netD, real_imgs, fake_imgs, real_labels, fake_labels, mu)
                 errD.backward()
                 optimizerD.step()
-
 
                 ############################
                 # (2) Azuriraj G mrezu (generator)
@@ -243,15 +243,12 @@ class GANTrainer_stage1():
                         inputs = (img_embeddings, fixed_noise)
                         _, fake_imgs, _, _ = netG(*inputs)
                         utils.save_img_results(real_img_cpu, fake_imgs.detach(), epoch, self.image_dir)
-                        #utils.save_img_results_with_desc(real_img_cpu, fake_imgs.detach(), txt_descriptions, epoch, self.image_dir)
-                        # if fake_source_img is not None:
-                        #     utils.save_img_results(None, fake_source_img, epoch, self.image_dir)
-                        
+                      
             avg_G_loss = total_G_loss / batch_count
             avg_D_loss = total_D_loss / batch_count
             
-            generator_losses.append(errG_total.item())
-            discriminator_losses.append(errD.item())
+            generator_losses.append(avg_G_loss)
+            discriminator_losses.append(avg_D_loss)
 
             if epoch == cfg.TRAIN_MAX_EPOCH - 1:
                 print(f"Descriptions for epoch {epoch+1}:")
@@ -266,9 +263,9 @@ class GANTrainer_stage1():
         netG, _ = self.load_networks()
 
         # path to save generated samples
-        save_dir = cfg.NET_G[:cfg.NET_G.find('.pth')]
+        save_dir = os.path.join(cfg.DATA_DIR, 'test')
         if not os.path.isdir(save_dir):
-            mkdir_p(save_dir)
+            os.makedirs(save_dir)
 
         nz = cfg.Z_DIM
         batch_size = self.batch_size
