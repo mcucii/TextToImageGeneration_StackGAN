@@ -9,6 +9,7 @@ from urllib.request import urlopen
 import torch.autograd as autograd
 
 import matplotlib.pyplot as plt
+import os
 
 def weight_initialization(m):
     classname = m.__class__.__name__

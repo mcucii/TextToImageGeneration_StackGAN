@@ -267,20 +267,22 @@ class GANTrainer_stage1():
         if not os.path.isdir(save_dir):
             os.makedirs(save_dir)
 
+        device = cfg.DEVICE
+
         nz = cfg.Z_DIM
         batch_size = self.batch_size
-        noise = Variable(torch.FloatTensor(batch_size, nz))
+        noise = torch.FloatTensor(batch_size, nz).to(device)
+
 
         count = 0
-        for i, data in enumerate(data_loader, 0):
-            _, txt_embedding = data
-            txt_embedding = Variable(txt_embedding)
+        for i, data in enumerate(dataloader, 0):
+            _, img_embeddings, txt_descriptions = data
+                #real_img_cpu, img_embeddings = data
 
-            if cfg.CUDA:
-                txt_embedding = txt_embedding.cuda()
+            img_embeddings = img_embeddings.to(device)
 
-            noise.data.normal_(0, 1)
-            inputs = (txt_embedding, noise)
+            noise.normal_(0, 1)
+            inputs = (img_embeddings, noise)
 
             _, fake_imgs, mu, logvar = netG(*inputs)
 

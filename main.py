@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 import torch
 
 class Args:
-    train = 1
+    train = 0
     stage = 1
 
 if Args.stage == 1:
@@ -85,7 +85,8 @@ def test():
                 transforms.ToTensor(),
                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
-    dataset = TextImageDataset(cfg.DATA_DIR, 'test', embedding_filename=cfg.EMBEDDING_FILENAME, transform=image_transform)
+
+    dataset = TextImageDataset(cfg.DATA_DIR, 'test', embedding_filename=cfg.EMBEDDING_FILENAME, input_transform=image_transform)
     dataloader = DataLoader(dataset, batch_size=cfg.TRAIN_BATCH_SIZE, drop_last=True, shuffle=True, num_workers=4)
     N = len(dataloader)
 
@@ -96,7 +97,7 @@ def test():
 
     trainer.test(dataloader)
 
-    dataset_generated = TextImageDataset(cfg.DATA_DIR, 'test', imsize=cfg.IMSIZE, transform=image_transform, embedding_filename=cfg.EMBEDDING_FILENAME)
+    dataset_generated = TextImageDataset(cfg.DATA_DIR, 'test', embedding_filename=cfg.EMBEDDING_FILENAME, img_size=cfg.IMG_SIZE, input_transform=image_transform)
     dataloader_generated = torch.utils.data.DataLoader(dataset_generated, batch_size=cfg.TRAIN_BATCH_SIZE, drop_last=True, shuffle=True, num_workers=4)
 
 
