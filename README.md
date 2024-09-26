@@ -14,5 +14,5 @@ Preprocesirani char-CNN-RNN tekstualni embbedding-zi:
 
 
 Na sledecem linku se mogu videti i rezultati dobijeni za rad nad 40 vrsti (folderi Images_Stage1, Images_Stage2 i dobijeni modeli): 
-[results](https://drive.google.com/drive/folders/1B1gQSpozd0_6mHBGxdEz0T0IBoIuE_ka)
+[results](https://drive.google.com/drive/folders/1d6DWY69CBEDFoxiA1peQLOWAssUfD6GW?usp=sharing)
 
