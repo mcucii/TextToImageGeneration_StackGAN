@@ -7,9 +7,7 @@ import random
 import torchvision.transforms as transforms
 import random
 
-
 from PIL import Image
-
 import config as cfg
 
 def get_random_line(text):

@@ -21,7 +21,7 @@ class CANet(nn.Module):
     logvar = x[:, self.c_dim:]
     return mu, logvar
 
-# reparametrizacija - 
+# reparametrizacija 
   def reparametrize(self, mu, logvar):
     std = logvar.mul(0.5).exp_()
     # eps - random noise

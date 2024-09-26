@@ -7,34 +7,32 @@ from torch.utils.data import DataLoader
 import torch
 
 class Args:
-    train = 0
+    train = 1
     stage = 1
 
 if Args.stage == 1:
     cfg.IMG_SIZE = 64
     cfg.NET_G = ''
     cfg.NET_D = ''
-    #cfg.TRAIN_MAX_EPOCH = 300
 else:
     cfg.IMG_SIZE = 256
-    #cfg.TRAIN_MAX_EPOCH = 300
-    cfg.STAGE1_G = "data_reduced10/birds/Model_stage1/netG_epoch_100.pth"
-    cfg.STAGE1_D = "data_reduced10/birds/Model_stage1/netD_epoch_100.pth"
+    cfg.STAGE1_G = "data_reduce1/birds/Model_stage1/netG_epoch_100.pth"
+    cfg.STAGE1_D = "data_reduced1/birds/Model_stage1/netD_epoch_100.pth"
 
 # za 40 vrsti:
 # cfg.TRAIN_DISCRIMINATOR_LR = 0.00005
 # cfg.TRAIN_GENERATOR_LR = 0.0002
 
-cfg.TRAIN_DISCRIMINATOR_LR = 0.00005
-cfg.TRAIN_GENERATOR_LR = 0.0002 # RADI FINO ZA GEN LR = 0.0005
+cfg.TRAIN_DISCRIMINATOR_LR = 0.0001
+cfg.TRAIN_GENERATOR_LR = 0.0008 # RADI FINO ZA GEN LR = 0.0005 za 1 vrstu
 
 cfg.STAGE = Args.stage
 
 if Args.train == 1:
     cfg.TRAIN = True
 else:
-    cfg.NET_G = "../data_reduced20/birds/Model_stage2/netG_epoch_200.pth"
-    cfg.NET_D = "../data_reduced20/birds/Model_stage2/netD_epoch_200.pth"
+    cfg.NET_G = "../data_reduced20/birds/Model_stage1/netG_epoch_100.pth"
+    cfg.NET_D = "../data_reduced20/birds/Model_stage1/netD_epoch_100.pth"
     cfg.TRAIN = False
 
 

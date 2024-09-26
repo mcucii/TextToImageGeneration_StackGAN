@@ -177,12 +177,11 @@ class GANTrainer_stage1():
 
         optimizerG = torch.optim.Adam(netG.parameters(), lr=generator_lr, betas=(0.5, 0.999))
         optimizerD = torch.optim.Adam(netD.parameters(), lr=discriminator_lr, betas=(0.5, 0.999))
-        # optimizerG = torch.optim.Adam(netG.parameters(), lr=generator_lr, betas=(0.5, 0.999))
+        #optimizerG = torch.optim.Adam(netG.parameters(), lr=generator_lr, betas=(0.5, 0.999))
         #optimizerD = torch.optim.SGD(netD.parameters(), lr=discriminator_lr, momentum=0.9)
 
         lambda_gp = 10
 
-        print(f"broj epoha {self.max_epoch}")
         
         for epoch in range(self.max_epoch):
             if epoch % lr_decay_step == 0 and epoch > 0:
@@ -257,7 +256,7 @@ class GANTrainer_stage1():
                     
             utils.save_model(netG, netD, self.max_epoch, self.model_dir)
 
-        utils.plot_losses(generator_losses, discriminator_losses)
+        utils.plot_losses(generator_losses, discriminator_losses, self.max_epoch)
 
     def test(self, dataloader, stage=1):
         netG, _ = self.load_networks()
@@ -287,6 +286,7 @@ class GANTrainer_stage1():
             _, fake_imgs, mu, logvar = netG(*inputs)
 
             utils.save_test_results(fake_imgs, count, save_dir)
+            print(f"Descriptions batch {i}: {txt_descriptions} \n")
 
             # for i in range(batch_size):
             #     save_name = '%s/%d.png' % (save_dir, count + i)

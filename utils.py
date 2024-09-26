@@ -11,6 +11,7 @@ import torch.autograd as autograd
 import matplotlib.pyplot as plt
 import os
 
+
 def weight_initialization(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
@@ -22,6 +23,32 @@ def weight_initialization(m):
         m.weight.data.normal_(0.0, 0.02)
         if m.bias is not None:
             m.bias.data.fill_(0.0)
+
+# def weight_initialization_xavier(m):
+#     classname = m.__class__.__name__
+#     if classname.find('Conv') != -1:
+#         nn.init.xavier_normal_(m.weight.data, gain=nn.init.calculate_gain('relu'))
+#     elif classname.find('BatchNorm') != -1:
+#         nn.init.ones_(m.weight.data)
+#         nn.init.zeros_(m.bias.data)
+#     elif classname.find('Linear') != -1:
+#         nn.init.xavier_normal_(m.weight.data)
+#         if m.bias is not None:
+#             nn.init.zeros_(m.bias.data)
+
+# def weight_initialization_he(m):
+#     classname = m.__class__.__name__
+#     if classname.find('Conv') != -1:
+#         nn.init.kaiming_normal_(m.weight.data, mode='fan_out', nonlinearity='relu')
+#     elif classname.find('BatchNorm') != -1:
+#         nn.init.ones_(m.weight.data)
+#         nn.init.zeros_(m.bias.data)
+#     elif classname.find('Linear') != -1:
+#         nn.init.kaiming_normal_(m.weight.data, mode='fan_out', nonlinearity='relu')
+#         if m.bias is not None:
+#             nn.init.zeros_(m.bias.data)
+
+
             
 
 def save_model(netG, netD, epoch, model_dir):
@@ -89,7 +116,8 @@ def generator_loss(netD, fake_imgs, real_labels, conditions, logvar):
     #errD_fake = -torch.mean(torch.log(fake_features + 1e-8))  # Izbegavanje log(0) dodavanjem malog epsilon-a
 
     kl_loss = KL_loss(conditions, logvar)
-    errG_total = errD_fake + kl_loss*0.5
+
+    errG_total = errD_fake + kl_loss*2
 
     return errG_total
 
@@ -101,7 +129,7 @@ def KL_loss(mu, logvar):
     return KLD
 
 
-def plot_losses(generator_losses, discriminator_losses):
+def plot_losses(generator_losses, discriminator_losses, max_epoch):
     plt.figure(figsize=(10, 5))
     
     # Plotovanje gubitaka generatora
@@ -120,5 +148,7 @@ def plot_losses(generator_losses, discriminator_losses):
     plt.title('Discriminator Loss per Epoch')
     plt.legend()
     
+    plt.xlim(0, max_epoch)  # Set x-axis limit based on max_epoch
     plt.tight_layout()
     plt.show()
+

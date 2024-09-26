@@ -8,8 +8,7 @@ NET_D = ''
 STAGE1_G = ''
 STAGE1_D = ''
 #DATA_DIR =  '/content/drive/MyDrive/RIProject/data_reduced20/birds'
-DATA_DIR =  '/home/masa/Desktop/MindArtify/data_reduced40/birds'
-
+DATA_DIR =  '/home/masa/Desktop/MindArtify/data_reduced1/birds'
 
 IMG_SIZE = 64
 STAGE = 1

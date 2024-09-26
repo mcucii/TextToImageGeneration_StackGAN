@@ -343,7 +343,7 @@ class GANTrainer_stage2():
 
             utils.save_model(netG, netD, self.max_epoch, self.model_dir)
 
-        utils.plot_losses(generator_losses, discriminator_losses)
+        utils.plot_losses(generator_losses, discriminator_losses, self.max_epoch)
 
     def test(self, dataloader, stage=1):
         netG, _ = self.load_networks()
