@@ -8,7 +8,7 @@ Skup podataka:
 - redukovan skup (20 vrsta): [Reduced CUB_200_2011 dataset (20 species)](https://drive.google.com/drive/folders/1B2nkJmgYV1wa2zZHuvhAv6vJ_uOFlMw6?usp=sharing)
 - redukovan skup (40 vrsta): [Reduced CUB_200_2011 dataset (40 species)](https://drive.google.com/drive/folders/1B1gQSpozd0_6mHBGxdEz0T0IBoIuE_ka) (slike su u birds/CUB_200_2011/images)
   
-Preprocesirani char-CNN-RNN tekstualni embbedding-zi:
+Preprocesirani char-CNN-RNN tekstualni embbeddings-i:
 [embeddings za CUB dataset](https://drive.google.com/file/d/0B3y_msrWZaXLT1BZdVdycDY5TEE/view?usp=sharing&resourcekey=0-sZrhftoEfdvHq6MweAeCjA)
 
 
