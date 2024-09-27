@@ -40,16 +40,17 @@ class Stage1_Generator(nn.Module):
         self.ca_net = ca.CANet()
         
         self.fc = nn.Sequential(
-            nn.Linear(self.z_dim + self.condition_dim, self.gf_dim * 4 * 4, bias=False),
+            nn.Linear(self.z_dim + self.condition_dim, self.gf_dim * 4 * 4, bias=False),        # 4x4 inicijalna velicina slike
             nn.BatchNorm1d(self.gf_dim * 4 * 4),
             nn.ReLU(True)
         )
         
-        self.upsample1 = upSamplingBlock(self.gf_dim, self.gf_dim // 2)
-        self.upsample2 = upSamplingBlock(self.gf_dim // 2, self.gf_dim // 4)
-        self.upsample3 = upSamplingBlock(self.gf_dim // 4, self.gf_dim // 8)
-        self.upsample4 = upSamplingBlock(self.gf_dim // 8, self.gf_dim // 16)
+        self.upsample1 = upSamplingBlock(self.gf_dim, self.gf_dim // 2)                         # velicina slike 8x8, broj kanala self.gf_dim/2
+        self.upsample2 = upSamplingBlock(self.gf_dim // 2, self.gf_dim // 4)                    # velicina slike 16x16, broj kanala self.gf_dim/4
+        self.upsample3 = upSamplingBlock(self.gf_dim // 4, self.gf_dim // 8)                    # velicina slike 32x32, broj kanala self.gf_dim/8
+        self.upsample4 = upSamplingBlock(self.gf_dim // 8, self.gf_dim // 16)                   # velicina slike 64x64, broj kanala self.gf_dim/16
 
+        # generisanje konacne slike, na kraju treba imamo samo 3 kanala - rgb
         self.img = nn.Sequential(
             conv3x3(self.gf_dim // 16 , 3),
             nn.Tanh()
